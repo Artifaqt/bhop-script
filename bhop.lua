@@ -835,13 +835,18 @@ local function updateDebugGUI(speed, onGround)
     if UserInputService:IsKeyDown(JUMP_KEY) then keysPressed = keysPressed .. "SPACE " end
     if keysPressed == "" then keysPressed = "NONE" end
 
+    -- Clean up velocity values (prevent -0.0/0.0 flickering)
+    local velX = math.abs(vel.X) < 0.1 and 0 or vel.X
+    local velY = math.abs(vel.Y) < 0.1 and 0 or vel.Y
+    local velZ = math.abs(vel.Z) < 0.1 and 0 or vel.Z
+
     debugText.Text = string.format(
         "%s %s | Speed: %.1f | Max: %.1f | Ground: %.1f | Vel: (%.1f, %.1f, %.1f) | Keys: %s",
         groundColor, groundStatus,
         speed,
         maxSpeedReached,
         config.GROUND_SPEED,
-        vel.X, vel.Y, vel.Z,
+        velX, velY, velZ,
         keysPressed
     )
 end
