@@ -39,7 +39,7 @@ cleanup()
 wait(0.1)
 
 -- GitHub Repository Base URL (UPDATE THIS WITH YOUR REPO)
-local GITHUB_BASE = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/modules/"
+local GITHUB_BASE = "https://raw.githubusercontent.com/Artifaqt/bhop-script/refs/heads/main/modules/"
 
 -- Load Modules
 print("[BHOP HUB] Loading modules...")
@@ -69,7 +69,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
     if input.KeyCode == Physics.getToggleKey() then
         Physics.toggleBhop()
-        UI.syncToggle(Physics.isEnabled())
+        pcall(function() UI.syncToggle(Physics.isEnabled()) end)
     end
 end)
 
