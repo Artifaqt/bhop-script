@@ -38,12 +38,12 @@ local originalJumpPower
 local config = {
     -- Ground movement
     GROUND_FRICTION = 4,
-    GROUND_ACCELERATE = 10,
+    GROUND_ACCELERATE = 100,  -- Higher for Roblox scale
     GROUND_SPEED = 16,
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 10,
+    AIR_ACCELERATE = 200,  -- Higher for responsive air control
     AIR_CAP = 0.7,  -- Air speed cap multiplier
 
     -- Jump
@@ -448,7 +448,10 @@ local function updatePhysics(dt)
     local didJump = false
     if autoHop and isGrounded then
         -- Auto-hop: always jump when grounded
-        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
+        -- Clamp near-zero values to prevent flickering
+        local velX = math.abs(vel2.X) < 0.01 and 0 or vel2.X
+        local velZ = math.abs(vel2.Y) < 0.01 and 0 or vel2.Y
+        rootPart.Velocity = Vector3.new(velX, config.JUMP_POWER, velZ)
         isGrounded = false
         lastGroundTime = 0
         didJump = true
@@ -460,7 +463,10 @@ local function updatePhysics(dt)
     -- 8. Apply velocity (set directly, preserve vertical component)
     if not didJump then
         local currentY = rootPart.Velocity.Y
-        rootPart.Velocity = Vector3.new(vel2.X, currentY, vel2.Y)
+        -- Clamp near-zero values to prevent flickering
+        local velX = math.abs(vel2.X) < 0.01 and 0 or vel2.X
+        local velZ = math.abs(vel2.Y) < 0.01 and 0 or vel2.Y
+        rootPart.Velocity = Vector3.new(velX, currentY, velZ)
     end
 
     -- 9. Snap to ground if needed
@@ -551,7 +557,9 @@ end
 
 -- Get horizontal speed
 function Physics.getSpeed2D()
-    return vel2.Magnitude
+    local speed = vel2.Magnitude
+    -- Clamp near-zero speeds to prevent displaying 0.1 when stationary
+    return speed < 0.1 and 0 or speed
 end
 
 function Physics.isGrounded()
