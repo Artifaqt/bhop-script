@@ -84,8 +84,8 @@ local debugData = {
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 10,
+        GROUND_ACCELERATE = 100,  -- Updated for Roblox scale
+        AIR_ACCELERATE = 200,  -- Updated for Roblox scale
         GROUND_SPEED = 16,
         AIR_CAP = 0.7,  -- Strafing cap multiplier
         JUMP_POWER = 50,
@@ -98,8 +98,8 @@ local presetLibrary = {
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 14,
-        AIR_ACCELERATE = 100,  -- CS:GO has very high air accel
+        GROUND_ACCELERATE = 140,  -- Updated for Roblox scale
+        AIR_ACCELERATE = 1000,  -- CS:GO has very high air accel
         GROUND_SPEED = 18,
         AIR_CAP = 0.4,  -- But very low air cap
         JUMP_POWER = 55,
@@ -112,8 +112,8 @@ local presetLibrary = {
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 15,
-        AIR_ACCELERATE = 10,
+        GROUND_ACCELERATE = 150,  -- Updated for Roblox scale
+        AIR_ACCELERATE = 200,  -- Updated for Roblox scale
         GROUND_SPEED = 26,
         AIR_CAP = 0.6,
         JUMP_POWER = 58,
@@ -126,8 +126,8 @@ local presetLibrary = {
     },
     ["Quake"] = {
         GROUND_FRICTION = 6,
-        GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 1,  -- Quake has low accel but allows high speeds
+        GROUND_ACCELERATE = 100,  -- Updated for Roblox scale
+        AIR_ACCELERATE = 10,  -- Quake has low accel but allows high speeds
         GROUND_SPEED = 20,
         AIR_CAP = 2,  -- High cap for speed building
         JUMP_POWER = 60,
@@ -140,8 +140,8 @@ local presetLibrary = {
     },
     ["Easy Mode"] = {
         GROUND_FRICTION = 2,
-        GROUND_ACCELERATE = 20,
-        AIR_ACCELERATE = 20,
+        GROUND_ACCELERATE = 200,  -- Updated for Roblox scale
+        AIR_ACCELERATE = 400,  -- Updated for Roblox scale
         GROUND_SPEED = 20,
         AIR_CAP = 1.5,
         JUMP_POWER = 60,
@@ -242,12 +242,8 @@ local function updateGroundState()
     raycastParams.FilterDescendantsInstances = {character}
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
-    -- Add trail parts to filter
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "BhopTrailPart" then
-            table.insert(raycastParams.FilterDescendantsInstances, obj)
-        end
-    end
+    -- Use AddToFilter method instead of iterating all descendants (performance fix)
+    raycastParams.CollisionGroup = "Default"
 
     local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 
@@ -411,9 +407,11 @@ local function updatePhysics(dt)
     updateGroundState()
     debugData.onGround = isGrounded
 
-    -- 3. Get current velocity from Roblox
+    -- 3. Get current velocity from Roblox and clamp near-zero to prevent flickering
     local robloxVel = rootPart.Velocity
-    vel2 = Vector2.new(robloxVel.X, robloxVel.Z)
+    local velX = math.abs(robloxVel.X) < 0.5 and 0 or robloxVel.X
+    local velZ = math.abs(robloxVel.Z) < 0.5 and 0 or robloxVel.Z
+    vel2 = Vector2.new(velX, velZ)
 
     -- 4. Build wish direction/speed
     local wishVel = getWishVelocity()
@@ -448,10 +446,7 @@ local function updatePhysics(dt)
     local didJump = false
     if autoHop and isGrounded then
         -- Auto-hop: always jump when grounded
-        -- Clamp near-zero values to prevent flickering
-        local velX = math.abs(vel2.X) < 0.01 and 0 or vel2.X
-        local velZ = math.abs(vel2.Y) < 0.01 and 0 or vel2.Y
-        rootPart.Velocity = Vector3.new(velX, config.JUMP_POWER, velZ)
+        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
         isGrounded = false
         lastGroundTime = 0
         didJump = true
@@ -463,10 +458,7 @@ local function updatePhysics(dt)
     -- 8. Apply velocity (set directly, preserve vertical component)
     if not didJump then
         local currentY = rootPart.Velocity.Y
-        -- Clamp near-zero values to prevent flickering
-        local velX = math.abs(vel2.X) < 0.01 and 0 or vel2.X
-        local velZ = math.abs(vel2.Y) < 0.01 and 0 or vel2.Y
-        rootPart.Velocity = Vector3.new(velX, currentY, velZ)
+        rootPart.Velocity = Vector3.new(vel2.X, currentY, vel2.Y)
     end
 
     -- 9. Snap to ground if needed
