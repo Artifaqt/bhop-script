@@ -50,8 +50,8 @@ local wasGrounded = true
 
 -- Sound Configuration
 local soundConfig = {
-    jumpSoundId = "rbxassetid://117034355804907",  -- Default jump sound
-    landSoundId = "rbxassetid://117034355804907",  -- Default land sound
+    jumpSoundId = "rbxassetid://0",  -- Default jump sound
+    landSoundId = "rbxassetid://0",  -- Default land sound
     jumpVolume = 0.5,
     landVolume = 0.3,
     jumpPitch = 1.0,
