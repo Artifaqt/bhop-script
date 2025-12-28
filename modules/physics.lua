@@ -28,7 +28,6 @@ local cachedInputs = {
     forward = 0,
     right = 0,
     jump = false,
-    yaw = 0,
 }
 
 -- Physics objects
@@ -38,17 +37,17 @@ local bodyVelocity
 local originalWalkSpeed
 local originalJumpPower
 
--- Configuration
+-- Configuration (CS 1.6 defaults)
 local config = {
     -- Ground movement
-    GROUND_FRICTION = 6,
+    GROUND_FRICTION = 4,
     GROUND_ACCELERATE = 10,
     GROUND_SPEED = 16,
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 16,
-    AIR_CAP = 10,
+    AIR_ACCELERATE = 10,
+    AIR_CAP = 0.7,  -- Air speed cap multiplier
 
     -- Jump
     JUMP_POWER = 50,
@@ -84,57 +83,77 @@ local debugData = {
     jumpBuffered = false,
 }
 
--- Preset Library
+-- Preset Library (tuned for Roblox scale and 2D movement)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
-        GROUND_FRICTION = 6,
+        GROUND_FRICTION = 4,
         GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 16,
+        AIR_ACCELERATE = 10,
         GROUND_SPEED = 16,
-        AIR_CAP = 10,
+        AIR_CAP = 0.7,  -- Strafing cap multiplier
         JUMP_POWER = 50,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
+        GROUND_DISTANCE = 0.2,
+        SNAP_DOWN_DISTANCE = 0.15,
+        COYOTE_TIME = 0.1,
+        JUMP_BUFFER_TIME = 0.1,
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 12,
-        AIR_ACCELERATE = 12,
+        GROUND_ACCELERATE = 14,
+        AIR_ACCELERATE = 100,  -- CS:GO has very high air accel
         GROUND_SPEED = 18,
-        AIR_CAP = 1.2,
+        AIR_CAP = 0.4,  -- But very low air cap
         JUMP_POWER = 55,
         STOP_SPEED = 1.5,
         SLOPE_LIMIT = 45,
+        GROUND_DISTANCE = 0.2,
+        SNAP_DOWN_DISTANCE = 0.15,
+        COYOTE_TIME = 0.1,
+        JUMP_BUFFER_TIME = 0.1,
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
         GROUND_ACCELERATE = 15,
         AIR_ACCELERATE = 10,
         GROUND_SPEED = 26,
-        AIR_CAP = 12,
+        AIR_CAP = 0.6,
         JUMP_POWER = 58,
         STOP_SPEED = 2,
         SLOPE_LIMIT = 50,
+        GROUND_DISTANCE = 0.2,
+        SNAP_DOWN_DISTANCE = 0.15,
+        COYOTE_TIME = 0.1,
+        JUMP_BUFFER_TIME = 0.1,
     },
     ["Quake"] = {
-        GROUND_FRICTION = 8,
+        GROUND_FRICTION = 6,
         GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 70,
+        AIR_ACCELERATE = 1,  -- Quake has low accel but allows high speeds
         GROUND_SPEED = 20,
-        AIR_CAP = 30,
+        AIR_CAP = 2,  -- High cap for speed building
         JUMP_POWER = 60,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 50,
+        GROUND_DISTANCE = 0.2,
+        SNAP_DOWN_DISTANCE = 0.15,
+        COYOTE_TIME = 0.1,
+        JUMP_BUFFER_TIME = 0.1,
     },
     ["Easy Mode"] = {
-        GROUND_FRICTION = 3,
+        GROUND_FRICTION = 2,
         GROUND_ACCELERATE = 20,
-        AIR_ACCELERATE = 30,
+        AIR_ACCELERATE = 20,
         GROUND_SPEED = 20,
-        AIR_CAP = 20,
+        AIR_CAP = 1.5,
         JUMP_POWER = 60,
         STOP_SPEED = 0.5,
         SLOPE_LIMIT = 60,
+        GROUND_DISTANCE = 0.2,
+        SNAP_DOWN_DISTANCE = 0.15,
+        COYOTE_TIME = 0.15,  -- More forgiving
+        JUMP_BUFFER_TIME = 0.15,  -- More forgiving
     },
 }
 
@@ -150,12 +169,26 @@ end
 -- Get yaw-only forward/right vectors (ignore pitch)
 local function getYawVectors()
     local camera = workspace.CurrentCamera
-    local yaw = math.atan2(-camera.CFrame.LookVector.X, -camera.CFrame.LookVector.Z)
+    local lookVector = camera.CFrame.LookVector
+    local rightVector = camera.CFrame.RightVector
 
-    local forward = Vector2.new(math.sin(yaw), math.cos(yaw))
-    local right = Vector2.new(math.cos(yaw), -math.sin(yaw))
+    -- Flatten to horizontal plane (ignore Y component) and normalize
+    local forward = Vector2.new(lookVector.X, lookVector.Z)
+    local right = Vector2.new(rightVector.X, rightVector.Z)
 
-    return forward, right, yaw
+    if forward:Dot(forward) > 0.01 then
+        forward = forward.Unit
+    else
+        forward = Vector2.new(0, 0)
+    end
+
+    if right:Dot(right) > 0.01 then
+        right = right.Unit
+    else
+        right = Vector2.new(0, 0)
+    end
+
+    return forward, right
 end
 
 -- Sample inputs once per tick
@@ -179,13 +212,9 @@ local function sampleInputs()
     -- Jump input
     local jump = UserInputService:IsKeyDown(keybindConfig.jumpKey)
 
-    -- Camera yaw
-    local _, _, yaw = getYawVectors()
-
     cachedInputs.forward = fmove
     cachedInputs.right = smove
     cachedInputs.jump = jump
-    cachedInputs.yaw = yaw
 end
 
 -- Build wish velocity from inputs (normalized diagonal)
@@ -398,8 +427,8 @@ local function updatePhysics(dt)
         -- Ground: wish speed is config value
         wishSpeed = config.GROUND_SPEED
     else
-        -- Air: wish speed is air cap
-        wishSpeed = config.AIR_CAP
+        -- Air: wish speed is air cap (multiplier of ground speed)
+        wishSpeed = config.GROUND_SPEED * config.AIR_CAP
     end
 
     debugData.wishSpeed = wishSpeed

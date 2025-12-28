@@ -307,9 +307,10 @@ function Visuals.update(speed, onGround, sessionStats)
                 actualAngleDeg = math.deg(math.acos(dot))
 
                 -- Calculate optimal strafe angle
-                if speed2D > config.AIR_CAP then
+                local airCapSpeed = config.GROUND_SPEED * config.AIR_CAP
+                if speed2D > airCapSpeed then
                     -- At speeds above AIR_CAP, there's an optimal angle
-                    local ratio = math.clamp(config.AIR_CAP / speed2D, 0, 1)
+                    local ratio = math.clamp(airCapSpeed / speed2D, 0, 1)
                     optimalAngleDeg = math.deg(math.acos(ratio))
                 else
                     -- Below AIR_CAP, optimal is to strafe directly forward

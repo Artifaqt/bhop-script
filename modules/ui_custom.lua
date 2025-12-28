@@ -9,7 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local UI = {}
 
 -- State
-local Physics, Visuals, Trails, Sounds, Stats
+local Physics, Visuals, Trails, Stats
 local screenGui
 local mainFrame
 local currentTab = "Dashboard"
@@ -491,7 +491,7 @@ local function createWindow()
     createCorner(8).Parent = closeButton
 
     closeButton.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
+        screenGui.Enabled = false
     end)
 
     -- Make draggable
@@ -739,85 +739,6 @@ local function createTrailsTab(parent)
     return container
 end
 
--- Create Sounds Tab
-local function createSoundsTab(parent)
-    local container = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 0),
-        BackgroundTransparency = 1,
-        Parent = parent,
-        Visible = false,
-    })
-
-    local layout = create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 10),
-        Parent = container,
-    })
-
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        container.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
-    end)
-
-    local soundConfig = Sounds.getConfig()
-
-    -- Enable Toggle
-    createToggle("Enable Sounds", container, function(state)
-        Sounds.setEnabled(state)
-    end)
-
-    -- Jump Sound Input
-    createInput("Jump Sound ID", "rbxassetid://0", function(text)
-        Sounds.setJumpSound(text)
-        -- Auto-preview
-        if text and text ~= "" then
-            task.delay(0.1, function()
-                Sounds.previewJump()
-            end)
-        end
-    end, container)
-
-    -- Test Jump Sound Button
-    createButton("Test Jump Sound", function()
-        Sounds.previewJump()
-    end, container)
-
-    -- Jump Volume & Pitch
-    createSlider("Jump Volume", 0, 1, soundConfig.jumpVolume, function(value)
-        Sounds.setJumpSound(nil, value, nil)
-    end, container)
-
-    createSlider("Jump Pitch", 0.5, 2, soundConfig.jumpPitch, function(value)
-        Sounds.setJumpSound(nil, nil, value)
-    end, container)
-
-    -- Land Sound Input
-    createInput("Land Sound ID", "rbxassetid://0", function(text)
-        Sounds.setLandSound(text)
-        -- Auto-preview
-        if text and text ~= "" then
-            task.delay(0.1, function()
-                Sounds.previewLand()
-            end)
-        end
-    end, container)
-
-    -- Test Land Sound Button
-    createButton("Test Land Sound", function()
-        Sounds.previewLand()
-    end, container)
-
-    -- Land Volume & Pitch
-    createSlider("Land Volume", 0, 1, soundConfig.landVolume, function(value)
-        Sounds.setLandSound(nil, value, nil)
-    end, container)
-
-    createSlider("Land Pitch", 0.5, 2, soundConfig.landPitch, function(value)
-        Sounds.setLandSound(nil, nil, value)
-    end, container)
-
-    return container
-end
-
 -- Create Config Tab
 local function createConfigTab(parent)
     local container = create("Frame", {
@@ -843,7 +764,6 @@ local function createConfigTab(parent)
             physics = Physics.exportConfig(),
             visuals = Visuals.exportConfig(),
             trails = Trails.exportConfig(),
-            sounds = Sounds.exportConfig(),
         }
 
         local encoded = HttpService:JSONEncode(exportData)
@@ -866,7 +786,6 @@ local function createConfigTab(parent)
             if importData.physics then Physics.importConfig(importData.physics) end
             if importData.visuals then Visuals.importConfig(importData.visuals) end
             if importData.trails then Trails.importConfig(importData.trails) end
-            if importData.sounds then Sounds.importConfig(importData.sounds) end
 
             -- Update all sliders
             local newConfig = Physics.getConfig()
@@ -972,11 +891,10 @@ local function createConfigTab(parent)
 end
 
 -- Initialize UI
-function UI.createWindow(physics, visuals, trails, sounds, stats)
+function UI.createWindow(physics, visuals, trails, stats)
     Physics = physics
     Visuals = visuals
     Trails = trails
-    Sounds = sounds
     Stats = stats
 
     local tabsContainer, contentContainer = createWindow()
@@ -985,7 +903,6 @@ function UI.createWindow(physics, visuals, trails, sounds, stats)
     local dashboardContent = createDashboard(contentContainer)
     local physicsContent = createPhysicsTab(contentContainer)
     local trailsContent = createTrailsTab(contentContainer)
-    local soundsContent = createSoundsTab(contentContainer)
     local configContent = createConfigTab(contentContainer)
 
     -- Tab buttons
@@ -993,7 +910,6 @@ function UI.createWindow(physics, visuals, trails, sounds, stats)
         {name = "Dashboard", content = dashboardContent},
         {name = "Physics", content = physicsContent},
         {name = "Trails", content = trailsContent},
-        {name = "Sounds", content = soundsContent},
         {name = "Config", content = configContent},
     }
 
@@ -1062,7 +978,6 @@ function UI.createWindow(physics, visuals, trails, sounds, stats)
         -- Update all modules with horizontal speed
         Visuals.update(speed2D, onGround, Stats.getStats())
         Trails.update(speed2D, dt)
-        Sounds.update(speed2D, onGround)
         Stats.updateStats(speed2D, dt)
     end)
 end
