@@ -38,13 +38,13 @@ local originalPhysicalProperties
 -- Configuration (CS 1.6 defaults)
 local config = {
     -- Ground movement
-    GROUND_FRICTION = 4,
-    GROUND_ACCELERATE = 1.0,  -- Scaled for Roblox with wishSpeed multiplication
+    GROUND_FRICTION = 2,  -- Lower friction to maintain speed on landing
+    GROUND_ACCELERATE = 5.0,  -- Higher for responsive ground movement
     GROUND_SPEED = 30,  -- Target ground speed in Roblox units
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 2.0,  -- Scaled for responsive air control
+    AIR_ACCELERATE = 3.0,  -- Higher for responsive air strafing
     AIR_CAP = 0.7,  -- Air speed cap multiplier (70% of ground speed)
 
     -- Jump
@@ -84,9 +84,9 @@ local debugData = {
 -- Preset Library (Roblox scale)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
-        GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 1.0,  -- Scaled for wishSpeed formula
-        AIR_ACCELERATE = 2.0,  -- Scaled for wishSpeed formula
+        GROUND_FRICTION = 2,  -- Lower to maintain speed
+        GROUND_ACCELERATE = 5.0,  -- Higher for responsive movement
+        AIR_ACCELERATE = 3.0,  -- Higher for good air control
         GROUND_SPEED = 30,
         AIR_CAP = 0.7,
         JUMP_POWER = 50,
@@ -98,9 +98,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["CS:GO Style"] = {
-        GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 1.1,  -- Scaled for wishSpeed formula
-        AIR_ACCELERATE = 2.4,  -- Scaled for wishSpeed formula (slightly higher than 1.6)
+        GROUND_FRICTION = 2.5,  -- Lower to maintain speed
+        GROUND_ACCELERATE = 5.5,  -- Higher for responsive movement
+        AIR_ACCELERATE = 3.5,  -- Slightly higher than 1.6
         GROUND_SPEED = 30,
         AIR_CAP = 0.3,  -- Very low air cap for tight control
         JUMP_POWER = 55,
@@ -112,9 +112,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["TF2 Scout"] = {
-        GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 1.3,  -- Scaled for wishSpeed formula
-        AIR_ACCELERATE = 2.5,  -- Scaled for wishSpeed formula
+        GROUND_FRICTION = 2,
+        GROUND_ACCELERATE = 6.0,  -- Higher for fast scout
+        AIR_ACCELERATE = 3.5,
         GROUND_SPEED = 40,  -- Scout is faster
         AIR_CAP = 0.6,
         JUMP_POWER = 58,
@@ -126,9 +126,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["Quake"] = {
-        GROUND_FRICTION = 6,
-        GROUND_ACCELERATE = 0.8,  -- Scaled for wishSpeed formula
-        AIR_ACCELERATE = 1.0,  -- Quake has low air accel - scaled
+        GROUND_FRICTION = 3,
+        GROUND_ACCELERATE = 4.0,
+        AIR_ACCELERATE = 2.0,  -- Quake has moderate air accel
         GROUND_SPEED = 35,
         AIR_CAP = 2.0,  -- But allows high speeds through strafing
         JUMP_POWER = 60,
@@ -140,9 +140,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["Easy Mode"] = {
-        GROUND_FRICTION = 2,
-        GROUND_ACCELERATE = 2.0,  -- Scaled for wishSpeed formula
-        AIR_ACCELERATE = 5.0,  -- Very high for easy mode - scaled
+        GROUND_FRICTION = 1,  -- Very low friction
+        GROUND_ACCELERATE = 8.0,  -- Very high acceleration
+        AIR_ACCELERATE = 8.0,  -- Very high for easy mode
         GROUND_SPEED = 35,
         AIR_CAP = 1.2,
         JUMP_POWER = 60,
