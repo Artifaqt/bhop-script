@@ -64,9 +64,15 @@ UI.createWindow(Physics, Visuals, Trails, Sounds, Stats)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
+    -- Toggle bhop
     if input.KeyCode == Physics.getToggleKey() then
         Physics.toggleBhop()
         UI.syncToggle(Physics.isEnabled())
+    end
+
+    -- Toggle UI
+    if input.KeyCode == Physics.getUIToggleKey() then
+        UI.toggleWindow()
     end
 end)
 

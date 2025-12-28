@@ -1,5 +1,6 @@
 -- Stats Module
 -- Handles session statistics tracking
+-- All speeds are horizontal (2D) speeds only
 
 local Stats = {}
 
@@ -7,11 +8,11 @@ local Stats = {}
 local sessionStats = {
     totalJumps = 0,
     perfectJumps = 0,
-    topSpeed = 0,
-    totalDistance = 0,
+    topSpeed = 0,  -- Max horizontal speed reached
+    totalDistance = 0,  -- Total horizontal distance traveled
     sessionTime = 0,
-    avgSpeed = 0,
-    speedSamples = {},
+    avgSpeed = 0,  -- Average horizontal speed
+    speedSamples = {},  -- Rolling window of speed samples
 }
 
 -- Module API
@@ -26,17 +27,17 @@ function Stats.recordJump(isPerfect)
     end
 end
 
-function Stats.updateStats(speed, dt)
+function Stats.updateStats(speed2D, dt)
     -- Update session time
     sessionStats.sessionTime = sessionStats.sessionTime + dt
 
-    -- Update speed samples for average
-    table.insert(sessionStats.speedSamples, speed)
+    -- Update speed samples for average (rolling window of 100 samples)
+    table.insert(sessionStats.speedSamples, speed2D)
     if #sessionStats.speedSamples > 100 then
         table.remove(sessionStats.speedSamples, 1)
     end
 
-    -- Calculate average speed
+    -- Calculate average horizontal speed
     local avgSpeed = 0
     for _, s in ipairs(sessionStats.speedSamples) do
         avgSpeed = avgSpeed + s
@@ -45,12 +46,12 @@ function Stats.updateStats(speed, dt)
         and (avgSpeed / #sessionStats.speedSamples)
         or 0
 
-    -- Update total distance
-    sessionStats.totalDistance = sessionStats.totalDistance + (speed * dt)
+    -- Update total horizontal distance traveled
+    sessionStats.totalDistance = sessionStats.totalDistance + (speed2D * dt)
 
-    -- Update top speed
-    if speed > sessionStats.topSpeed then
-        sessionStats.topSpeed = speed
+    -- Update top horizontal speed
+    if speed2D > sessionStats.topSpeed then
+        sessionStats.topSpeed = speed2D
     end
 end
 

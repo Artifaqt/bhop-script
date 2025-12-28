@@ -383,14 +383,14 @@ local function createDropdown(name, options, callback, parent)
     })
 
     local optionsFrame = create("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 0, math.min(#options * 32, 160)),
-        Position = UDim2.new(0, 0, 1, 4),
+        Size = UDim2.new(0, 0, 0, math.min(#options * 32, 160)),
+        Position = UDim2.new(0, 0, 0, 0),
         BackgroundColor3 = theme.surface,
         BorderSizePixel = 0,
         ScrollBarThickness = 4,
         Visible = false,
-        ZIndex = 10,
-        Parent = container,
+        ZIndex = 100,
+        Parent = nil,  -- Will be set to screenGui when first opened
     })
     createCorner(6).Parent = optionsFrame
 
@@ -422,6 +422,17 @@ local function createDropdown(name, options, callback, parent)
 
     dropdownBack.MouseButton1Click:Connect(function()
         optionsFrame.Visible = not optionsFrame.Visible
+
+        if optionsFrame.Visible then
+            -- Parent to screenGui for top-level rendering
+            optionsFrame.Parent = screenGui
+
+            -- Position below the dropdown button using absolute screen coordinates
+            local absPos = dropdownBack.AbsolutePosition
+            local absSize = dropdownBack.AbsoluteSize
+            optionsFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
+            optionsFrame.Size = UDim2.new(0, absSize.X, 0, math.min(#options * 32, 160))
+        end
     end)
 
     return container
@@ -888,6 +899,75 @@ local function createConfigTab(parent)
         print("[BHOP HUB] Reset to CS 1.6 defaults")
     end, container)
 
+    -- Spacer
+    create("Frame", {
+        Size = UDim2.new(1, 0, 0, 20),
+        BackgroundTransparency = 1,
+        Parent = container,
+    })
+
+    -- Section header
+    local keybindsHeader = create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 25),
+        BackgroundTransparency = 1,
+        Text = "⌨️ KEYBINDS",
+        TextColor3 = theme.accent,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = container,
+    })
+
+    -- Get current keybinds
+    local keybinds = Physics.getKeybinds()
+
+    -- Toggle Bhop Keybind
+    local toggleKeyInput = createInput("Toggle Bhop Key", keybinds.toggleKey.Name, function(text)
+        local keyCode = Enum.KeyCode[text]
+        if keyCode then
+            Physics.setKeybind("toggleKey", keyCode)
+            print("[BHOP HUB] Toggle key set to: " .. text)
+        else
+            warn("[BHOP HUB] Invalid key: " .. text)
+        end
+    end, container)
+
+    -- Jump Keybind
+    local jumpKeyInput = createInput("Jump Key", keybinds.jumpKey.Name, function(text)
+        local keyCode = Enum.KeyCode[text]
+        if keyCode then
+            Physics.setKeybind("jumpKey", keyCode)
+            print("[BHOP HUB] Jump key set to: " .. text)
+        else
+            warn("[BHOP HUB] Invalid key: " .. text)
+        end
+    end, container)
+
+    -- UI Toggle Keybind
+    local uiToggleKeyInput = createInput("Toggle UI Key", keybinds.uiToggleKey.Name, function(text)
+        local keyCode = Enum.KeyCode[text]
+        if keyCode then
+            Physics.setKeybind("uiToggleKey", keyCode)
+            print("[BHOP HUB] UI toggle key set to: " .. text)
+        else
+            warn("[BHOP HUB] Invalid key: " .. text)
+        end
+    end, container)
+
+    -- Keybind help text
+    local helpText = create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundTransparency = 1,
+        Text = "Enter key names like: B, Space, LeftShift, RightShift, etc.\nChanges save automatically in config export/import.",
+        TextColor3 = theme.textDim,
+        TextSize = 11,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        TextWrapped = true,
+        Parent = container,
+    })
+
     return container
 end
 
@@ -958,11 +1038,11 @@ function UI.createWindow(physics, visuals, trails, sounds, stats)
         Parent = tabsContainer,
     })
 
-    -- Setup update loop
+    -- Setup update loop (use Heartbeat for consistency)
     local wasGrounded = false
-    RunService.RenderStepped:Connect(function(dt)
-        local velocity = Physics.getVelocity()
-        local speed = velocity.Magnitude
+    RunService.Heartbeat:Connect(function(dt)
+        -- Use horizontal speed (2D)
+        local speed2D = Physics.getSpeed2D()
         local onGround = Physics.isGrounded()
 
         -- Keep ground state in sync even when disabled
@@ -974,16 +1054,16 @@ function UI.createWindow(physics, visuals, trails, sounds, stats)
         -- Track jump stats independently (so disabling sounds doesn't break stats)
         if (not wasGrounded) and onGround then
             local cfg = Physics.getConfig()
-            local isPerfect = speed > (cfg.GROUND_SPEED * 0.9)
+            local isPerfect = speed2D > (cfg.GROUND_SPEED * 0.9)
             Stats.recordJump(isPerfect)
         end
         wasGrounded = onGround
 
-        -- Update all modules
-        Visuals.update(speed, onGround, Stats.getStats())
-        Trails.update(speed, dt)
-        Sounds.update(speed, onGround)
-        Stats.updateStats(speed, dt)
+        -- Update all modules with horizontal speed
+        Visuals.update(speed2D, onGround, Stats.getStats())
+        Trails.update(speed2D, dt)
+        Sounds.update(speed2D, onGround)
+        Stats.updateStats(speed2D, dt)
     end)
 end
 
@@ -991,6 +1071,13 @@ end
 function UI.syncToggle(enabled)
     if bhopToggle then
         bhopToggle:Set(enabled)
+    end
+end
+
+-- Toggle window visibility
+function UI.toggleWindow()
+    if screenGui then
+        screenGui.Enabled = not screenGui.Enabled
     end
 end
 

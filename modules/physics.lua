@@ -1,5 +1,5 @@
--- Physics Module
--- Handles all bhop physics calculations and state
+-- Physics Module (Source Engine Style)
+-- Handles all bhop physics calculations with CS/Source fidelity
 
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,32 +10,79 @@ local Physics = {}
 local player, character, humanoid, rootPart
 local bhopEnabled = false
 local autoHop = false
-local isJumping = false
 local isTyping = false
-local currentVelocity = Vector3.new(0, 0, 0)
+
+-- Movement state (2D horizontal only)
+local vel2 = Vector2.new(0, 0)  -- Horizontal velocity (X, Z)
 local maxSpeedReached = 0
+
+-- Grounding state
+local isGrounded = false
+local groundNormal = Vector3.new(0, 1, 0)
+local lastGroundTime = 0
+local lastJumpRequestTime = 0
+local justLanded = false
+
+-- Input cache
+local cachedInputs = {
+    forward = 0,
+    right = 0,
+    jump = false,
+    yaw = 0,
+}
+
+-- Physics objects
 local bodyVelocity
+
+-- Store originals
+local originalWalkSpeed
+local originalJumpPower
 
 -- Configuration
 local config = {
+    -- Ground movement
     GROUND_FRICTION = 6,
     GROUND_ACCELERATE = 10,
-    AIR_ACCELERATE = 16,
     GROUND_SPEED = 16,
-    AIR_CAP = 10,
-    JUMP_POWER = 50,
     STOP_SPEED = 1,
+
+    -- Air movement
+    AIR_ACCELERATE = 16,
+    AIR_CAP = 10,
+
+    -- Jump
+    JUMP_POWER = 50,
+
+    -- Grounding
+    GROUND_DISTANCE = 0.2,  -- How far to raycast for ground
+    SLOPE_LIMIT = 45,  -- Max walkable slope in degrees
+    SNAP_DOWN_DISTANCE = 0.15,  -- Snap-to-ground distance
+
+    -- Feel improvements
+    COYOTE_TIME = 0.1,  -- Grace period after leaving ground (seconds)
+    JUMP_BUFFER_TIME = 0.1,  -- Jump buffer window (seconds)
 }
 
 -- Keybinds
 local keybindConfig = {
     toggleKey = Enum.KeyCode.B,
     jumpKey = Enum.KeyCode.Space,
+    uiToggleKey = Enum.KeyCode.RightShift,
 }
 
--- Store originals
-local originalWalkSpeed
-local originalJumpPower
+-- Movement debug data (exposed for HUD)
+local debugData = {
+    wishSpeed = 0,
+    currentSpeed = 0,
+    addSpeed = 0,
+    accelSpeed = 0,
+    onGround = false,
+    surfaceAngle = 0,
+    dt = 0,
+    speed2D = 0,
+    coyoteActive = false,
+    jumpBuffered = false,
+}
 
 -- Preset Library
 local presetLibrary = {
@@ -47,15 +94,17 @@ local presetLibrary = {
         AIR_CAP = 10,
         JUMP_POWER = 50,
         STOP_SPEED = 1,
+        SLOPE_LIMIT = 45,
     },
     ["CS:GO Style"] = {
-        GROUND_FRICTION = 5,
+        GROUND_FRICTION = 5.2,
         GROUND_ACCELERATE = 12,
-        AIR_ACCELERATE = 1200,
+        AIR_ACCELERATE = 12,
         GROUND_SPEED = 18,
-        AIR_CAP = 0.4,
+        AIR_CAP = 1.2,
         JUMP_POWER = 55,
         STOP_SPEED = 1.5,
+        SLOPE_LIMIT = 45,
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
@@ -65,6 +114,7 @@ local presetLibrary = {
         AIR_CAP = 12,
         JUMP_POWER = 58,
         STOP_SPEED = 2,
+        SLOPE_LIMIT = 50,
     },
     ["Quake"] = {
         GROUND_FRICTION = 8,
@@ -74,6 +124,7 @@ local presetLibrary = {
         AIR_CAP = 30,
         JUMP_POWER = 60,
         STOP_SPEED = 1,
+        SLOPE_LIMIT = 50,
     },
     ["Easy Mode"] = {
         GROUND_FRICTION = 3,
@@ -83,130 +134,325 @@ local presetLibrary = {
         AIR_CAP = 20,
         JUMP_POWER = 60,
         STOP_SPEED = 0.5,
+        SLOPE_LIMIT = 60,
     },
 }
 
--- Physics Functions
-local function isGrounded()
-    local rayOrigin = rootPart.Position
-    local rayDirection = Vector3.new(0, -4, 0)
-    local raycastParams = RaycastParams.new()
+--------------------------------------------------------------------------------
+-- HELPER FUNCTIONS
+--------------------------------------------------------------------------------
 
+-- Clamp delta time to prevent huge spikes on lag
+local function clampDt(dt)
+    return math.clamp(dt, 1/240, 1/30)
+end
+
+-- Get yaw-only forward/right vectors (ignore pitch)
+local function getYawVectors()
+    local camera = workspace.CurrentCamera
+    local yaw = math.atan2(-camera.CFrame.LookVector.X, -camera.CFrame.LookVector.Z)
+
+    local forward = Vector2.new(math.sin(yaw), math.cos(yaw))
+    local right = Vector2.new(math.cos(yaw), -math.sin(yaw))
+
+    return forward, right, yaw
+end
+
+-- Sample inputs once per tick
+local function sampleInputs()
+    if isTyping then
+        cachedInputs.forward = 0
+        cachedInputs.right = 0
+        cachedInputs.jump = false
+        return
+    end
+
+    -- WASD inputs
+    local fmove = 0
+    local smove = 0
+
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then fmove = fmove + 1 end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then fmove = fmove - 1 end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then smove = smove + 1 end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then smove = smove - 1 end
+
+    -- Jump input
+    local jump = UserInputService:IsKeyDown(keybindConfig.jumpKey)
+
+    -- Camera yaw
+    local _, _, yaw = getYawVectors()
+
+    cachedInputs.forward = fmove
+    cachedInputs.right = smove
+    cachedInputs.jump = jump
+    cachedInputs.yaw = yaw
+end
+
+-- Build wish velocity from inputs (normalized diagonal)
+local function getWishVelocity()
+    local forward, right = getYawVectors()
+
+    -- Build wish velocity
+    local wishVel = forward * cachedInputs.forward + right * cachedInputs.right
+
+    -- Normalize diagonal input (so W+A isn't faster than W alone)
+    if wishVel:Dot(wishVel) > 0.01 then
+        wishVel = wishVel.Unit
+    else
+        wishVel = Vector2.new(0, 0)
+    end
+
+    return wishVel
+end
+
+-- Robust ground detection with slope checking
+local function updateGroundState()
+    if not rootPart then return end
+
+    local rayOrigin = rootPart.Position + Vector3.new(0, 0.1, 0)
+    local rayDirection = Vector3.new(0, -(config.GROUND_DISTANCE + 0.1), 0)
+
+    local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    -- Add trail parts to filter
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "BhopTrailPart" then
+            table.insert(raycastParams.FilterDescendantsInstances, obj)
+        end
+    end
 
     local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-    return raycastResult ~= nil
+
+    if raycastResult then
+        groundNormal = raycastResult.Normal
+
+        -- Check slope limit (only walkable if normal.Y >= cos(slopeLimit))
+        local slopeAngle = math.deg(math.acos(groundNormal.Y))
+        debugData.surfaceAngle = slopeAngle
+
+        if slopeAngle <= config.SLOPE_LIMIT then
+            local wasGrounded = isGrounded
+            isGrounded = true
+            justLanded = not wasGrounded
+            lastGroundTime = tick()
+            return
+        end
+    end
+
+    isGrounded = false
+    justLanded = false
+    groundNormal = Vector3.new(0, 1, 0)
 end
 
-local function getWishDir()
-    if isTyping then
-        return Vector3.new(0, 0, 0)
-    end
+-- Snap down to ground (sticky ground)
+local function snapToGround()
+    if not isGrounded or not rootPart then return end
 
-    local camera = workspace.CurrentCamera
-    local moveVector = Vector3.new(0, 0, 0)
+    local rayOrigin = rootPart.Position
+    local rayDirection = Vector3.new(0, -config.SNAP_DOWN_DISTANCE, 0)
 
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-        moveVector = moveVector + camera.CFrame.LookVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-        moveVector = moveVector - camera.CFrame.LookVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-        moveVector = moveVector - camera.CFrame.RightVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-        moveVector = moveVector + camera.CFrame.RightVector
-    end
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
-    if moveVector.Magnitude > 0 then
-        return moveVector.Unit
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+    if raycastResult then
+        local snapDist = raycastResult.Distance - 0.05
+        if snapDist > 0 then
+            rootPart.CFrame = rootPart.CFrame - Vector3.new(0, snapDist, 0)
+        end
     end
-    return Vector3.new(0, 0, 0)
 end
 
-local function airAccelerate(wishdir, wishspeed, accel, dt)
-    local currentspeed = currentVelocity:Dot(wishdir)
-    local addspeed = wishspeed - currentspeed
+--------------------------------------------------------------------------------
+-- MOVEMENT FUNCTIONS (Source-style)
+--------------------------------------------------------------------------------
 
-    if addspeed <= 0 then
-        return
-    end
-
-    local accelspeed = math.min(accel * wishspeed * dt, addspeed)
-    currentVelocity = currentVelocity + wishdir * accelspeed
-end
-
-local function groundAccelerate(wishdir, wishspeed, accel, dt)
-    local currentspeed = currentVelocity:Dot(wishdir)
-    local addspeed = wishspeed - currentspeed
-
-    if addspeed <= 0 then
-        return
-    end
-
-    local accelspeed = math.min(accel * dt * wishspeed, addspeed)
-    currentVelocity = currentVelocity + wishdir * accelspeed
-end
-
+-- Apply friction (ground only, Source-style)
 local function applyFriction(dt)
-    local speed = currentVelocity.Magnitude
+    local speed = vel2.Magnitude
 
     if speed < 0.1 then
-        currentVelocity = Vector3.new(0, 0, 0)
+        vel2 = Vector2.new(0, 0)
         return
     end
 
-    local control = speed < config.STOP_SPEED and config.STOP_SPEED or speed
+    -- Source-style friction: drop = max(speed, STOP_SPEED) * FRICTION * dt
+    local control = math.max(speed, config.STOP_SPEED)
     local drop = control * config.GROUND_FRICTION * dt
+
+    -- Calculate new speed
     local newSpeed = math.max(speed - drop, 0)
 
+    -- Scale velocity
     if speed > 0 then
-        currentVelocity = currentVelocity * (newSpeed / speed)
+        vel2 = vel2 * (newSpeed / speed)
     end
 end
+
+-- Source-style acceleration (air or ground)
+local function accelerate(wishDir, wishSpeed, accel, dt)
+    -- Current speed in wish direction
+    local currentSpeed = vel2:Dot(wishDir)
+
+    -- How much speed to add
+    local addSpeed = wishSpeed - currentSpeed
+
+    if addSpeed <= 0 then
+        debugData.addSpeed = 0
+        debugData.accelSpeed = 0
+        return
+    end
+
+    -- Acceleration amount
+    local accelSpeed = accel * wishSpeed * dt
+    accelSpeed = math.min(accelSpeed, addSpeed)
+
+    -- Apply acceleration
+    vel2 = vel2 + wishDir * accelSpeed
+
+    -- Debug data
+    debugData.currentSpeed = currentSpeed
+    debugData.addSpeed = addSpeed
+    debugData.accelSpeed = accelSpeed
+end
+
+-- Handle jump with coyote time and jump buffering
+local function handleJump()
+    local currentTime = tick()
+
+    -- Track jump buffer
+    if cachedInputs.jump then
+        lastJumpRequestTime = currentTime
+    end
+
+    -- Check if we can jump
+    local canJump = false
+    local coyoteActive = false
+    local jumpBuffered = false
+
+    -- Coyote time: can jump for a short time after leaving ground
+    if isGrounded then
+        canJump = true
+    elseif (currentTime - lastGroundTime) <= config.COYOTE_TIME then
+        canJump = true
+        coyoteActive = true
+    end
+
+    -- Jump buffer: if jump was pressed recently and we just landed
+    if justLanded and (currentTime - lastJumpRequestTime) <= config.JUMP_BUFFER_TIME then
+        jumpBuffered = true
+    end
+
+    -- Execute jump
+    if canJump and (cachedInputs.jump or jumpBuffered) then
+        -- Apply jump (vertical only)
+        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
+
+        -- Prevent re-triggering
+        isGrounded = false
+        lastGroundTime = 0
+
+        return true
+    end
+
+    debugData.coyoteActive = coyoteActive
+    debugData.jumpBuffered = jumpBuffered
+
+    return false
+end
+
+--------------------------------------------------------------------------------
+-- MAIN PHYSICS UPDATE
+--------------------------------------------------------------------------------
 
 local function updatePhysics(dt)
     if not bhopEnabled or not character or not rootPart then
         return
     end
 
-    local wishDir = getWishDir()
-    local onGround = isGrounded()
+    -- Clamp dt
+    dt = clampDt(dt)
+    debugData.dt = dt
 
-    if onGround then
-        applyFriction(dt)
-        groundAccelerate(wishDir, config.GROUND_SPEED, config.GROUND_ACCELERATE, dt)
+    -- 1. Sample inputs once
+    sampleInputs()
 
-        -- Auto-hop or manual jump
-        local shouldJump = false
-        if autoHop and not isTyping then
-            shouldJump = not isJumping
-        elseif UserInputService:IsKeyDown(keybindConfig.jumpKey) and not isJumping and not isTyping then
-            shouldJump = true
-        end
+    -- 2. Update grounded state
+    updateGroundState()
+    debugData.onGround = isGrounded
 
-        if shouldJump then
-            rootPart.Velocity = Vector3.new(currentVelocity.X, config.JUMP_POWER, currentVelocity.Z)
-            isJumping = true
-        end
+    -- 3. Get current velocity from Roblox
+    local robloxVel = rootPart.Velocity
+    vel2 = Vector2.new(robloxVel.X, robloxVel.Z)
+
+    -- 4. Build wish direction/speed
+    local wishVel = getWishVelocity()
+    local wishDir = wishVel
+    local wishSpeed = 0
+
+    if isGrounded then
+        -- Ground: wish speed is config value
+        wishSpeed = config.GROUND_SPEED
     else
-        local wishspeed = config.AIR_CAP
-        airAccelerate(wishDir, wishspeed, config.AIR_ACCELERATE, dt)
-        isJumping = false
+        -- Air: wish speed is air cap
+        wishSpeed = config.AIR_CAP
     end
 
-    local newVelocity = Vector3.new(currentVelocity.X, 0, currentVelocity.Z)
-    bodyVelocity.Velocity = newVelocity
+    debugData.wishSpeed = wishSpeed
 
-    local speed = currentVelocity.Magnitude
-    if speed > maxSpeedReached then
-        maxSpeedReached = speed
+    -- 5. Apply friction (ground only)
+    if isGrounded then
+        applyFriction(dt)
+    end
+
+    -- 6. Apply acceleration
+    if wishDir:Dot(wishDir) > 0.01 then
+        if isGrounded then
+            accelerate(wishDir, wishSpeed, config.GROUND_ACCELERATE, dt)
+        else
+            accelerate(wishDir, wishSpeed, config.AIR_ACCELERATE, dt)
+        end
+    end
+
+    -- 7. Handle jump (auto-hop or manual)
+    local didJump = false
+    if autoHop and isGrounded then
+        -- Auto-hop: always jump when grounded
+        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
+        isGrounded = false
+        lastGroundTime = 0
+        didJump = true
+    else
+        -- Manual jump with coyote time and jump buffer
+        didJump = handleJump()
+    end
+
+    -- 8. Apply velocity (horizontal only, preserve Roblox's vertical physics)
+    if not didJump then
+        bodyVelocity.Velocity = Vector3.new(vel2.X, 0, vel2.Y)
+    end
+
+    -- 9. Snap to ground if needed
+    if isGrounded and not didJump then
+        snapToGround()
+    end
+
+    -- 10. Track max speed
+    local speed2D = vel2.Magnitude
+    debugData.speed2D = speed2D
+    if speed2D > maxSpeedReached then
+        maxSpeedReached = speed2D
     end
 end
 
--- Module API
+--------------------------------------------------------------------------------
+-- MODULE API
+--------------------------------------------------------------------------------
+
 function Physics.init(plr, char, hum, root)
     player = plr
     character = char
@@ -233,8 +479,8 @@ function Physics.init(plr, char, hum, root)
         isTyping = false
     end)
 
-    -- Physics Loop
-    RunService.RenderStepped:Connect(function(dt)
+    -- Physics Loop (use Heartbeat for consistency)
+    RunService.Heartbeat:Connect(function(dt)
         if bhopEnabled then
             updatePhysics(dt)
         end
@@ -251,7 +497,7 @@ function Physics.toggleBhop(value)
     if bhopEnabled then
         humanoid.WalkSpeed = 0
         humanoid.JumpPower = 0
-        currentVelocity = Vector3.new(0, 0, 0)
+        vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
         bodyVelocity.MaxForce = Vector3.new(100000, 0, 100000)
     else
@@ -277,16 +523,28 @@ function Physics.isEnabled()
     return bhopEnabled
 end
 
+-- Get horizontal velocity as Vector3 (for compatibility)
 function Physics.getVelocity()
-    return currentVelocity
+    return Vector3.new(vel2.X, 0, vel2.Y)
+end
+
+-- Get true 2D velocity
+function Physics.getVelocity2D()
+    return vel2
+end
+
+-- Get horizontal speed
+function Physics.getSpeed2D()
+    return vel2.Magnitude
 end
 
 function Physics.isGrounded()
-    return isGrounded()
+    return isGrounded
 end
 
 function Physics.getWishDir()
-    return getWishDir()
+    local wishVel = getWishVelocity()
+    return Vector3.new(wishVel.X, 0, wishVel.Y)
 end
 
 function Physics.getConfig()
@@ -303,6 +561,26 @@ function Physics.getToggleKey()
     return keybindConfig.toggleKey
 end
 
+function Physics.getUIToggleKey()
+    return keybindConfig.uiToggleKey
+end
+
+function Physics.getKeybinds()
+    return keybindConfig
+end
+
+function Physics.setKeybind(key, keyCode)
+    if keybindConfig[key] ~= nil then
+        keybindConfig[key] = keyCode
+        return true
+    end
+    return false
+end
+
+function Physics.getDebugData()
+    return debugData
+end
+
 function Physics.getPresets()
     return presetLibrary
 end
@@ -310,7 +588,9 @@ end
 function Physics.loadPreset(presetName)
     if presetLibrary[presetName] then
         for key, value in pairs(presetLibrary[presetName]) do
-            config[key] = value
+            if config[key] ~= nil then
+                config[key] = value
+            end
         end
         return true
     end
@@ -324,6 +604,7 @@ function Physics.exportConfig()
         keybinds = {
             toggleKey = keybindConfig.toggleKey.Name,
             jumpKey = keybindConfig.jumpKey.Name,
+            uiToggleKey = keybindConfig.uiToggleKey.Name,
         },
     }
 end
@@ -342,8 +623,15 @@ function Physics.importConfig(data)
     end
 
     if data.keybinds then
-        keybindConfig.toggleKey = Enum.KeyCode[data.keybinds.toggleKey] or Enum.KeyCode.B
-        keybindConfig.jumpKey = Enum.KeyCode[data.keybinds.jumpKey] or Enum.KeyCode.Space
+        if data.keybinds.toggleKey then
+            keybindConfig.toggleKey = Enum.KeyCode[data.keybinds.toggleKey] or Enum.KeyCode.B
+        end
+        if data.keybinds.jumpKey then
+            keybindConfig.jumpKey = Enum.KeyCode[data.keybinds.jumpKey] or Enum.KeyCode.Space
+        end
+        if data.keybinds.uiToggleKey then
+            keybindConfig.uiToggleKey = Enum.KeyCode[data.keybinds.uiToggleKey] or Enum.KeyCode.RightShift
+        end
     end
 end
 

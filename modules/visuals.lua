@@ -19,7 +19,9 @@ local visualConfig = {
 local velocityMeterFrame, velocityValue, velocityBarFill
 local strafeHelperFrame, directionArrow, strafeQualityLabel
 local sessionStatsFrame, jumpCountLabel, perfectJumpLabel, topSpeedLabel, avgSpeedLabel, distanceLabel, sessionTimeLabel
-local debugHUDFrame, debugSpeedLabel, debugVelXLabel, debugVelZLabel, debugGroundLabel, debugFrictionLabel, debugAirAccelLabel, debugMaxSpeedLabel
+local debugHUDFrame, debugSpeedLabel, debugVelXLabel, debugVelZLabel, debugGroundLabel
+local debugWishSpeedLabel, debugCurrentSpeedLabel, debugAddSpeedLabel, debugAccelSpeedLabel
+local debugSurfaceAngleLabel, debugDtLabel, debugCoyoteLabel, debugJumpBufferLabel
 
 local function createVelocityMeter()
     velocityMeterFrame = Instance.new("Frame")
@@ -184,7 +186,7 @@ end
 local function createDebugHUD()
     debugHUDFrame = Instance.new("Frame")
     debugHUDFrame.Name = "DebugHUD"
-    debugHUDFrame.Size = UDim2.new(0, 280, 0, 200)
+    debugHUDFrame.Size = UDim2.new(0, 280, 0, 305)
     debugHUDFrame.Position = UDim2.new(0, 20, 0, 20)
     debugHUDFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     debugHUDFrame.BackgroundTransparency = 0.2
@@ -225,13 +227,18 @@ local function createDebugHUD()
         return label
     end
 
-    debugSpeedLabel = createDebugLabel("Speed: 0.0", 0)
+    debugSpeedLabel = createDebugLabel("Speed 2D: 0.0", 0)
     debugVelXLabel = createDebugLabel("Vel X: 0.0", 22)
     debugVelZLabel = createDebugLabel("Vel Z: 0.0", 44)
     debugGroundLabel = createDebugLabel("Ground: false", 66)
-    debugFrictionLabel = createDebugLabel("Friction: 6", 88)
-    debugAirAccelLabel = createDebugLabel("Air Accel: 16", 110)
-    debugMaxSpeedLabel = createDebugLabel("Max Speed: 0.0", 132)
+    debugSurfaceAngleLabel = createDebugLabel("Surface °: 0.0", 88)
+    debugWishSpeedLabel = createDebugLabel("Wish Speed: 0.0", 110)
+    debugCurrentSpeedLabel = createDebugLabel("Current Speed: 0.0", 132)
+    debugAddSpeedLabel = createDebugLabel("Add Speed: 0.0", 154)
+    debugAccelSpeedLabel = createDebugLabel("Accel Speed: 0.0", 176)
+    debugDtLabel = createDebugLabel("dt: 0.000", 198)
+    debugCoyoteLabel = createDebugLabel("Coyote: false", 220)
+    debugJumpBufferLabel = createDebugLabel("Jump Buffer: false", 242)
 end
 
 -- Module API
@@ -379,15 +386,21 @@ function Visuals.update(speed, onGround, sessionStats)
         debugHUDFrame.Visible = true
 
         local velocity = Physics.getVelocity()
-        local config = Physics.getConfig()
+        local vel2D = Physics.getVelocity2D()
+        local debugData = Physics.getDebugData()
 
-        debugSpeedLabel.Text = string.format("Speed: %.1f", speed)
-        debugVelXLabel.Text = string.format("Vel X: %.1f", velocity.X)
-        debugVelZLabel.Text = string.format("Vel Z: %.1f", velocity.Z)
+        debugSpeedLabel.Text = string.format("Speed 2D: %.1f", speed)
+        debugVelXLabel.Text = string.format("Vel X: %.1f", vel2D.X)
+        debugVelZLabel.Text = string.format("Vel Z: %.1f", vel2D.Y)
         debugGroundLabel.Text = string.format("Ground: %s", tostring(onGround))
-        debugFrictionLabel.Text = string.format("Friction: %d", config.GROUND_FRICTION)
-        debugAirAccelLabel.Text = string.format("Air Accel: %d", config.AIR_ACCELERATE)
-        debugMaxSpeedLabel.Text = string.format("Max Speed: %.1f", sessionStats and sessionStats.topSpeed or 0)
+        debugSurfaceAngleLabel.Text = string.format("Surface °: %.1f", debugData.surfaceAngle)
+        debugWishSpeedLabel.Text = string.format("Wish Speed: %.1f", debugData.wishSpeed)
+        debugCurrentSpeedLabel.Text = string.format("Current Speed: %.1f", debugData.currentSpeed)
+        debugAddSpeedLabel.Text = string.format("Add Speed: %.1f", debugData.addSpeed)
+        debugAccelSpeedLabel.Text = string.format("Accel Speed: %.1f", debugData.accelSpeed)
+        debugDtLabel.Text = string.format("dt: %.3f", debugData.dt)
+        debugCoyoteLabel.Text = string.format("Coyote: %s", tostring(debugData.coyoteActive))
+        debugJumpBufferLabel.Text = string.format("Jump Buffer: %s", tostring(debugData.jumpBuffered))
     else
         debugHUDFrame.Visible = false
     end
