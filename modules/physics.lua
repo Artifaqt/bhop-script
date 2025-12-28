@@ -38,13 +38,13 @@ local originalJumpPower
 local config = {
     -- Ground movement
     GROUND_FRICTION = 4,
-    GROUND_ACCELERATE = 100,  -- Higher for Roblox scale
-    GROUND_SPEED = 16,
-    STOP_SPEED = 1,
+    GROUND_ACCELERATE = 10,  -- Source Engine value
+    GROUND_SPEED = 250,  -- Source Engine units (250 = standard run speed)
+    STOP_SPEED = 100,
 
     -- Air movement
-    AIR_ACCELERATE = 200,  -- Higher for responsive air control
-    AIR_CAP = 0.7,  -- Air speed cap multiplier
+    AIR_ACCELERATE = 10,  -- Source Engine value
+    AIR_CAP = 0.3,  -- Air speed cap multiplier
 
     -- Jump
     JUMP_POWER = 50,
@@ -80,16 +80,16 @@ local debugData = {
     jumpBuffered = false,
 }
 
--- Preset Library (tuned for Roblox scale and 2D movement)
+-- Preset Library (Source Engine units)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 100,  -- Updated for Roblox scale
-        AIR_ACCELERATE = 200,  -- Updated for Roblox scale
-        GROUND_SPEED = 16,
-        AIR_CAP = 0.7,  -- Strafing cap multiplier
+        GROUND_ACCELERATE = 10,
+        AIR_ACCELERATE = 10,
+        GROUND_SPEED = 250,  -- Source units
+        AIR_CAP = 0.3,
         JUMP_POWER = 50,
-        STOP_SPEED = 1,
+        STOP_SPEED = 100,
         SLOPE_LIMIT = 45,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -98,12 +98,12 @@ local presetLibrary = {
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 140,  -- Updated for Roblox scale
-        AIR_ACCELERATE = 1000,  -- CS:GO has very high air accel
-        GROUND_SPEED = 18,
-        AIR_CAP = 0.4,  -- But very low air cap
+        GROUND_ACCELERATE = 14,
+        AIR_ACCELERATE = 100,  -- CS:GO has very high air accel
+        GROUND_SPEED = 250,
+        AIR_CAP = 0.08,  -- Very low air cap
         JUMP_POWER = 55,
-        STOP_SPEED = 1.5,
+        STOP_SPEED = 100,
         SLOPE_LIMIT = 45,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -112,12 +112,12 @@ local presetLibrary = {
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 150,  -- Updated for Roblox scale
-        AIR_ACCELERATE = 200,  -- Updated for Roblox scale
-        GROUND_SPEED = 26,
-        AIR_CAP = 0.6,
+        GROUND_ACCELERATE = 15,
+        AIR_ACCELERATE = 10,
+        GROUND_SPEED = 400,  -- Scout is faster
+        AIR_CAP = 0.25,
         JUMP_POWER = 58,
-        STOP_SPEED = 2,
+        STOP_SPEED = 100,
         SLOPE_LIMIT = 50,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -126,12 +126,12 @@ local presetLibrary = {
     },
     ["Quake"] = {
         GROUND_FRICTION = 6,
-        GROUND_ACCELERATE = 100,  -- Updated for Roblox scale
-        AIR_ACCELERATE = 10,  -- Quake has low accel but allows high speeds
-        GROUND_SPEED = 20,
-        AIR_CAP = 2,  -- High cap for speed building
+        GROUND_ACCELERATE = 10,
+        AIR_ACCELERATE = 1,  -- Quake has very low air accel
+        GROUND_SPEED = 320,
+        AIR_CAP = 1.0,  -- But allows high speeds
         JUMP_POWER = 60,
-        STOP_SPEED = 1,
+        STOP_SPEED = 100,
         SLOPE_LIMIT = 50,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -140,12 +140,12 @@ local presetLibrary = {
     },
     ["Easy Mode"] = {
         GROUND_FRICTION = 2,
-        GROUND_ACCELERATE = 200,  -- Updated for Roblox scale
-        AIR_ACCELERATE = 400,  -- Updated for Roblox scale
-        GROUND_SPEED = 20,
-        AIR_CAP = 1.5,
+        GROUND_ACCELERATE = 20,
+        AIR_ACCELERATE = 20,
+        GROUND_SPEED = 300,
+        AIR_CAP = 0.6,
         JUMP_POWER = 60,
-        STOP_SPEED = 0.5,
+        STOP_SPEED = 50,
         SLOPE_LIMIT = 60,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -329,8 +329,9 @@ local function accelerate(wishDir, wishSpeed, accel, dt)
         return
     end
 
-    -- Acceleration amount
-    local accelSpeed = accel * wishSpeed * dt
+    -- Acceleration amount (Source Engine formula)
+    -- accel is studs/second², dt is seconds
+    local accelSpeed = accel * dt * wishSpeed
     accelSpeed = math.min(accelSpeed, addSpeed)
 
     -- Apply acceleration
