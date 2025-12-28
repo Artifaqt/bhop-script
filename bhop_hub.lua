@@ -2,10 +2,6 @@
 -- CS 1.6 Style Bunny Hop Physics for Roblox
 -- Modular Version - Main Loader
 
--- Load Libraries
-local Starlight = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/starlight"))()
-local NebulaIcons = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/nebula-icon-library-loader"))()
-
 -- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -18,15 +14,16 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 -- Cleanup from previous execution
 local function cleanup()
     local playerGui = player:WaitForChild("PlayerGui")
+
+    -- Remove old GUIs
     local oldGui = playerGui:FindFirstChild("BhopVisualsGUI")
-    if oldGui then
-        oldGui:Destroy()
-    end
+    if oldGui then oldGui:Destroy() end
+
+    local oldCustomGui = playerGui:FindFirstChild("BhopHubUI")
+    if oldCustomGui then oldCustomGui:Destroy() end
 
     local oldBodyVel = rootPart:FindFirstChild("BhopVelocity")
-    if oldBodyVel then
-        oldBodyVel:Destroy()
-    end
+    if oldBodyVel then oldBodyVel:Destroy() end
 
     humanoid.WalkSpeed = 16
     humanoid.JumpPower = 50
@@ -49,7 +46,7 @@ local Visuals = loadstring(game:HttpGet(GITHUB_BASE .. "visuals.lua"))()
 local Trails = loadstring(game:HttpGet(GITHUB_BASE .. "trails.lua"))()
 local Sounds = loadstring(game:HttpGet(GITHUB_BASE .. "sounds.lua"))()
 local Stats = loadstring(game:HttpGet(GITHUB_BASE .. "stats.lua"))()
-local UI = loadstring(game:HttpGet(GITHUB_BASE .. "ui.lua"))()
+local UI = loadstring(game:HttpGet(GITHUB_BASE .. "ui_custom.lua"))()
 
 print("[BHOP HUB] All modules loaded!")
 
@@ -60,8 +57,8 @@ Trails.init(player, rootPart, Physics)
 Sounds.init(rootPart, Physics, Stats)
 Stats.init()
 
--- Create UI
-UI.createWindow(Starlight, NebulaIcons, Physics, Visuals, Trails, Sounds, Stats)
+-- Create Custom UI
+UI.createWindow(Physics, Visuals, Trails, Sounds, Stats)
 
 -- Input Handling
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -69,7 +66,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
     if input.KeyCode == Physics.getToggleKey() then
         Physics.toggleBhop()
-        pcall(function() UI.syncToggle(Physics.isEnabled()) end)
+        UI.syncToggle(Physics.isEnabled())
     end
 end)
 
