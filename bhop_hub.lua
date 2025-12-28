@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- Bhop Hub by Artifaqt
 -- CS 1.6 Style Bunny Hop Physics for Roblox
 -- Modular Version - Main Loader
@@ -54,11 +55,23 @@ local UI = loadstring(game:HttpGet(GITHUB_BASE .. "ui.lua"))()
 print("[BHOP HUB] All modules loaded!")
 
 -- Initialize modules
+=======
+local GITHUB_BASE = "https://raw.githubusercontent.com/Artifaqt/bhop-script/refs/heads/main/modules/"
+
+local Physics  = loadstring(game:HttpGet(GITHUB_BASE .. "physics.lua"))()
+local Visuals  = loadstring(game:HttpGet(GITHUB_BASE .. "visuals.lua"))()
+local Trails   = loadstring(game:HttpGet(GITHUB_BASE .. "trails.lua"))()
+local Sounds   = loadstring(game:HttpGet(GITHUB_BASE .. "sounds.lua"))()
+local Stats    = loadstring(game:HttpGet(GITHUB_BASE .. "stats.lua"))()
+local UI       = loadstring(game:HttpGet(GITHUB_BASE .. "ui.lua"))()
+
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
 Physics.init(player, character, humanoid, rootPart)
 Visuals.init(player, Physics)
 Trails.init(player, rootPart, Physics)
 Sounds.init(rootPart, Physics, Stats)
 Stats.init()
+<<<<<<< HEAD
 
 -- Create UI
 UI.createWindow(Starlight, NebulaIcons, Physics, Visuals, Trails, Sounds, Stats)
@@ -74,3 +87,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 print("[BHOP HUB] Loaded successfully! Press 'B' to toggle bhop mode.")
+=======
+UI.createWindow(Starlight, NebulaIcons, Physics, Visuals, Trails, Sounds, Stats)
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3

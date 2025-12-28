@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- UI Module
 -- Creates and manages the Starlight UI
 
@@ -763,3 +764,7 @@ end
 end
 
 return UI
+=======
+-- ui.lua placeholder
+return {}
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3

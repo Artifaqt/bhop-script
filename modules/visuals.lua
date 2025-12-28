@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- Visuals Module
 -- Handles velocity meter, strafe helper, session stats display, and debug HUD
 
@@ -378,3 +379,7 @@ function Visuals.importConfig(data)
 end
 
 return Visuals
+=======
+-- visuals.lua placeholder
+return {}
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3

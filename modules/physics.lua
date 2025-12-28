@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- Physics Module
 -- Handles all bhop physics calculations and state
 
@@ -348,3 +349,7 @@ function Physics.importConfig(data)
 end
 
 return Physics
+=======
+-- physics.lua placeholder
+return {}
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3

@@ -1,9 +1,13 @@
+<<<<<<< HEAD
 -- Trails Module
 -- Enhanced trail system with decal support
 
 local Trails = {}
 
 local HttpService = game:GetService("HttpService")
+=======
+local Trails = { }
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
 
 local function normalizeAssetId(input)
     if not input then return nil end
@@ -18,6 +22,7 @@ local function normalizeAssetId(input)
     return nil
 end
 
+<<<<<<< HEAD
 local trailPresets = {}
 
 
@@ -182,11 +187,21 @@ end
 
 function Trails.setDecalTexture(textureId)
     local asset = normalizeAssetId(textureId)
+=======
+
+local trailConfig = {
+    decalTexture = "rbxassetid://8508980536",
+}
+
+function Trails.setDecalTexture(input)
+    local asset = normalizeAssetId(input)
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
     if asset then
         trailConfig.decalTexture = asset
     end
 end
 
+<<<<<<< HEAD
 function Trails.setColor(color)
     trailConfig.color = color
 end
@@ -356,4 +371,7 @@ function Trails.importConfig(data)
     end
 end
 
+=======
+function Trails.init() end
+>>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
 return Trails
