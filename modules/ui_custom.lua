@@ -840,44 +840,60 @@ local function createConfigTab(parent)
     -- Get current keybinds
     local keybinds = Physics.getKeybinds()
 
-    -- Toggle Bhop Keybind
-    local toggleKeyInput = createInput("Toggle Bhop Key", keybinds.toggleKey.Name, function(text)
-        local keyCode = Enum.KeyCode[text]
-        if keyCode then
-            Physics.setKeybind("toggleKey", keyCode)
-            print("[BHOP HUB] Toggle key set to: " .. text)
-        else
-            warn("[BHOP HUB] Invalid key: " .. text)
-        end
-    end, container)
+    -- Helper function to create keybind button
+    local function createKeybindButton(name, keybindKey)
+        local buttonContainer = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 60),
+            BackgroundTransparency = 1,
+            Parent = container,
+        })
 
-    -- Jump Keybind
-    local jumpKeyInput = createInput("Jump Key", keybinds.jumpKey.Name, function(text)
-        local keyCode = Enum.KeyCode[text]
-        if keyCode then
-            Physics.setKeybind("jumpKey", keyCode)
-            print("[BHOP HUB] Jump key set to: " .. text)
-        else
-            warn("[BHOP HUB] Invalid key: " .. text)
-        end
-    end, container)
+        local label = create("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 20),
+            BackgroundTransparency = 1,
+            Text = name,
+            TextColor3 = theme.text,
+            TextSize = 13,
+            Font = Enum.Font.GothamMedium,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = buttonContainer,
+        })
 
-    -- UI Toggle Keybind
-    local uiToggleKeyInput = createInput("Toggle UI Key", keybinds.uiToggleKey.Name, function(text)
-        local keyCode = Enum.KeyCode[text]
-        if keyCode then
-            Physics.setKeybind("uiToggleKey", keyCode)
-            print("[BHOP HUB] UI toggle key set to: " .. text)
-        else
-            warn("[BHOP HUB] Invalid key: " .. text)
-        end
-    end, container)
+        local button = createButton("Press any key...", function() end, buttonContainer)
+        button.Position = UDim2.new(0, 0, 0, 25)
+        button.Text = keybinds[keybindKey].Name
+
+        local listening = false
+        local connection
+
+        button.MouseButton1Click:Connect(function()
+            if listening then return end
+            listening = true
+            button.Text = "Press any key..."
+            button.BackgroundColor3 = theme.warning
+
+            connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    Physics.setKeybind(keybindKey, input.KeyCode)
+                    button.Text = input.KeyCode.Name
+                    button.BackgroundColor3 = theme.accent
+                    listening = false
+                    connection:Disconnect()
+                    print("[BHOP HUB] " .. name .. " set to: " .. input.KeyCode.Name)
+                end
+            end)
+        end)
+    end
+
+    createKeybindButton("Toggle Bhop Key", "toggleKey")
+    createKeybindButton("Jump Key", "jumpKey")
+    createKeybindButton("Toggle UI Key", "uiToggleKey")
 
     -- Keybind help text
     local helpText = create("TextLabel", {
         Size = UDim2.new(1, 0, 0, 40),
         BackgroundTransparency = 1,
-        Text = "Enter key names like: B, Space, LeftShift, RightShift, etc.\nChanges save automatically in config export/import.",
+        Text = "Click a button and press any key to bind it.\nChanges save automatically in config export/import.",
         TextColor3 = theme.textDim,
         TextSize = 11,
         Font = Enum.Font.Gotham,

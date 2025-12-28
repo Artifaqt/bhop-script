@@ -30,9 +30,6 @@ local cachedInputs = {
     jump = false,
 }
 
--- Physics objects
-local bodyVelocity
-
 -- Store originals
 local originalWalkSpeed
 local originalJumpPower
@@ -460,9 +457,10 @@ local function updatePhysics(dt)
         didJump = handleJump()
     end
 
-    -- 8. Apply velocity (horizontal only, preserve Roblox's vertical physics)
+    -- 8. Apply velocity (set directly, preserve vertical component)
     if not didJump then
-        bodyVelocity.Velocity = Vector3.new(vel2.X, 0, vel2.Y)
+        local currentY = rootPart.Velocity.Y
+        rootPart.Velocity = Vector3.new(vel2.X, currentY, vel2.Y)
     end
 
     -- 9. Snap to ground if needed
@@ -490,14 +488,6 @@ function Physics.init(plr, char, hum, root)
 
     originalWalkSpeed = humanoid.WalkSpeed
     originalJumpPower = humanoid.JumpPower
-
-    -- Create BodyVelocity
-    bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "BhopVelocity"
-    bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-    bodyVelocity.P = 10000
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.Parent = rootPart
 
     -- Track text box focus
     UserInputService.TextBoxFocused:Connect(function()
@@ -528,13 +518,10 @@ function Physics.toggleBhop(value)
         humanoid.JumpPower = 0
         vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
-        bodyVelocity.MaxForce = Vector3.new(100000, 0, 100000)
     else
         humanoid.WalkSpeed = originalWalkSpeed
         humanoid.JumpPower = originalJumpPower
         rootPart.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
     end
 
     return bhopEnabled
