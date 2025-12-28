@@ -488,6 +488,16 @@ function Physics.init(plr, char, hum, root)
     originalWalkSpeed = humanoid.WalkSpeed
     originalJumpPower = humanoid.JumpPower
 
+    -- Disable Roblox material-based friction (this is critical!)
+    -- Set CustomPhysicalProperties to override material friction
+    rootPart.CustomPhysicalProperties = PhysicalProperties.new(
+        0.7,   -- Density
+        0,     -- Friction (ZERO - we handle this ourselves)
+        0,     -- Elasticity
+        1,     -- FrictionWeight
+        1      -- ElasticityWeight
+    )
+
     -- Track text box focus
     UserInputService.TextBoxFocused:Connect(function()
         isTyping = true
