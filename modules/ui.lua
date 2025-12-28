@@ -760,6 +760,5 @@ function UI.syncToggle(enabled)
         end)
     end
 end
-end
 
 return UI
