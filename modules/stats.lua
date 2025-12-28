@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 -- Stats Module
 -- Handles session statistics tracking
 
@@ -78,7 +77,3 @@ function Stats.importConfig(data)
 end
 
 return Stats
-=======
--- stats.lua placeholder
-return {}
->>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3

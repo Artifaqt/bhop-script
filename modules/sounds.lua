@@ -1,13 +1,9 @@
-<<<<<<< HEAD
 -- Sounds Module
 -- Handles all sound effects
 
 local Sounds = {}
 
 local ContentProvider = game:GetService("ContentProvider")
-=======
-local Sounds = { }
->>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
 
 local function normalizeAssetId(input)
     if not input then return nil end
@@ -22,7 +18,6 @@ local function normalizeAssetId(input)
     return nil
 end
 
-<<<<<<< HEAD
 local warned = {}
 local function warnOnce(key, msg)
     if warned[key] then return end
@@ -200,28 +195,4 @@ function Sounds.previewLand(optionalInput)
     return safePlay(landSound, "land_preview_play")
 end
 
-=======
-
-local jumpSound = Instance.new("Sound")
-local landSound = Instance.new("Sound")
-
-jumpSound.SoundId = "rbxassetid://117034355804907"
-landSound.SoundId = "rbxassetid://117034355804907"
-
-function Sounds.setJumpSound(input, volume, pitch)
-    local asset = normalizeAssetId(input)
-    if asset then jumpSound.SoundId = asset end
-    if volume then jumpSound.Volume = volume end
-    if pitch then jumpSound.PlaybackSpeed = pitch end
-end
-
-function Sounds.setLandSound(input, volume, pitch)
-    local asset = normalizeAssetId(input)
-    if asset then landSound.SoundId = asset end
-    if volume then landSound.Volume = volume end
-    if pitch then landSound.PlaybackSpeed = pitch end
-end
-
-function Sounds.init() end
->>>>>>> 0025280d5488b7ed7179d1d1d6b72baa4496fdc3
 return Sounds
