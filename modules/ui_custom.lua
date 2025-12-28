@@ -977,19 +977,20 @@ function UI.createWindow(physics, visuals, trails, stats)
         local speed2D = Physics.getSpeed2D()
         local onGround = Physics.isGrounded()
 
-        -- Keep ground state in sync even when disabled
-        if not Physics.isEnabled() then
-            wasGrounded = onGround
-            return
-        end
-
-        -- Track jump stats independently (so disabling sounds doesn't break stats)
-        if (not wasGrounded) and onGround then
-            local cfg = Physics.getConfig()
-            local isPerfect = speed2D > (cfg.GROUND_SPEED * 0.9)
-            Stats.recordJump(isPerfect)
+        -- Track jump stats (when leaving ground, not landing)
+        if Physics.isEnabled() then
+            if wasGrounded and (not onGround) then
+                local cfg = Physics.getConfig()
+                local isPerfect = speed2D > (cfg.GROUND_SPEED * 0.9)
+                Stats.recordJump(isPerfect)
+            end
         end
         wasGrounded = onGround
+
+        -- Keep updating visuals/trails/stats even when disabled
+        if not Physics.isEnabled() then
+            return
+        end
 
         -- Update all modules with horizontal speed
         Visuals.update(speed2D, onGround, Stats.getStats())

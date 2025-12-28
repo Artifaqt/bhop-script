@@ -33,17 +33,18 @@ local cachedInputs = {
 -- Store originals
 local originalWalkSpeed
 local originalJumpPower
+local originalPhysicalProperties
 
 -- Configuration (CS 1.6 defaults)
 local config = {
     -- Ground movement
     GROUND_FRICTION = 4,
-    GROUND_ACCELERATE = 5,  -- Reduced for Roblox scale
+    GROUND_ACCELERATE = 5,
     GROUND_SPEED = 30,  -- Target ground speed in Roblox units
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 50,  -- Higher for responsive strafing
+    AIR_ACCELERATE = 10,  -- CS 1.6 default value
     AIR_CAP = 0.7,  -- Air speed cap multiplier (70% of ground speed)
 
     -- Jump
@@ -85,7 +86,7 @@ local presetLibrary = {
     ["CS 1.6 Classic"] = {
         GROUND_FRICTION = 4,
         GROUND_ACCELERATE = 5,
-        AIR_ACCELERATE = 50,
+        AIR_ACCELERATE = 10,  -- CS 1.6 default (sv_airaccelerate 10)
         GROUND_SPEED = 30,
         AIR_CAP = 0.7,
         JUMP_POWER = 50,
@@ -98,8 +99,8 @@ local presetLibrary = {
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 7,
-        AIR_ACCELERATE = 200,  -- CS:GO has very high air accel
+        GROUND_ACCELERATE = 5.6,  -- CS:GO default (sv_accelerate 5.6)
+        AIR_ACCELERATE = 12,  -- CS:GO default (sv_airaccelerate 12)
         GROUND_SPEED = 30,
         AIR_CAP = 0.3,  -- Very low air cap for tight control
         JUMP_POWER = 55,
@@ -329,8 +330,8 @@ local function accelerate(wishDir, wishSpeed, accel, dt)
         return
     end
 
-    -- Acceleration amount (Source Engine formula)
-    -- accel is studs/second², dt is seconds
+    -- Acceleration amount (correct Source Engine formula)
+    -- accel * dt * wishSpeed gives proper acceleration
     local accelSpeed = accel * dt * wishSpeed
     accelSpeed = math.min(accelSpeed, addSpeed)
 
@@ -487,6 +488,7 @@ function Physics.init(plr, char, hum, root)
 
     originalWalkSpeed = humanoid.WalkSpeed
     originalJumpPower = humanoid.JumpPower
+    originalPhysicalProperties = rootPart.CustomPhysicalProperties
 
     -- Disable Roblox material-based friction (this is critical!)
     -- Set CustomPhysicalProperties to override material friction
@@ -527,10 +529,22 @@ function Physics.toggleBhop(value)
         humanoid.JumpPower = 0
         vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
+
+        -- Apply custom physics properties
+        rootPart.CustomPhysicalProperties = PhysicalProperties.new(
+            0.7,   -- Density
+            0,     -- Friction (ZERO - we handle this ourselves)
+            0,     -- Elasticity
+            1,     -- FrictionWeight
+            1      -- ElasticityWeight
+        )
     else
         humanoid.WalkSpeed = originalWalkSpeed
         humanoid.JumpPower = originalJumpPower
         rootPart.Velocity = Vector3.new(0, 0, 0)
+
+        -- Restore original physical properties
+        rootPart.CustomPhysicalProperties = originalPhysicalProperties
     end
 
     return bhopEnabled
