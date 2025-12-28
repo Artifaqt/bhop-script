@@ -33,7 +33,7 @@ local cachedInputs = {
 -- Store originals
 local originalWalkSpeed
 local originalJumpPower
-local originalPhysicalProperties
+local originalPhysicalProperties = {}  -- Store for all body parts
 
 -- Configuration (CS 1.6 defaults)
 local config = {
@@ -45,13 +45,13 @@ local config = {
 
     -- Air movement
     AIR_ACCELERATE = 3.0,  -- Higher for responsive air strafing
-    AIR_CAP = 0.7,  -- Air speed cap multiplier (70% of ground speed)
+    AIR_CAP = 1.0,  -- Air wishspeed cap (1.0 = no limit, same as ground)
 
     -- Jump
     JUMP_POWER = 50,
 
     -- Grounding
-    GROUND_DISTANCE = 0.2,  -- How far to raycast for ground
+    GROUND_DISTANCE = 0.8,  -- How far to raycast for ground (increased for Roblox)
     SLOPE_LIMIT = 45,  -- Max walkable slope in degrees
     SNAP_DOWN_DISTANCE = 0.15,  -- Snap-to-ground distance
 
@@ -88,11 +88,11 @@ local presetLibrary = {
         GROUND_ACCELERATE = 5.0,  -- Higher for responsive movement
         AIR_ACCELERATE = 3.0,  -- Higher for good air control
         GROUND_SPEED = 30,
-        AIR_CAP = 0.7,
+        AIR_CAP = 1.0,  -- Air wishspeed cap = ground speed (no limit)
         JUMP_POWER = 50,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
-        GROUND_DISTANCE = 0.2,
+        GROUND_DISTANCE = 0.8,  -- Increased for Roblox
         SNAP_DOWN_DISTANCE = 0.15,
         COYOTE_TIME = 0.1,
         JUMP_BUFFER_TIME = 0.1,
@@ -102,11 +102,11 @@ local presetLibrary = {
         GROUND_ACCELERATE = 5.5,  -- Higher for responsive movement
         AIR_ACCELERATE = 3.5,  -- Slightly higher than 1.6
         GROUND_SPEED = 30,
-        AIR_CAP = 0.3,  -- Very low air cap for tight control
+        AIR_CAP = 0.8,  -- Less restrictive for Roblox
         JUMP_POWER = 55,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
-        GROUND_DISTANCE = 0.2,
+        GROUND_DISTANCE = 0.8,  -- Increased for Roblox
         SNAP_DOWN_DISTANCE = 0.15,
         COYOTE_TIME = 0.1,
         JUMP_BUFFER_TIME = 0.1,
@@ -116,11 +116,11 @@ local presetLibrary = {
         GROUND_ACCELERATE = 6.0,  -- Higher for fast scout
         AIR_ACCELERATE = 3.5,
         GROUND_SPEED = 40,  -- Scout is faster
-        AIR_CAP = 0.6,
+        AIR_CAP = 1.0,  -- No air limit
         JUMP_POWER = 58,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 50,
-        GROUND_DISTANCE = 0.2,
+        GROUND_DISTANCE = 0.8,  -- Increased for Roblox
         SNAP_DOWN_DISTANCE = 0.15,
         COYOTE_TIME = 0.1,
         JUMP_BUFFER_TIME = 0.1,
@@ -130,11 +130,11 @@ local presetLibrary = {
         GROUND_ACCELERATE = 4.0,
         AIR_ACCELERATE = 2.0,  -- Quake has moderate air accel
         GROUND_SPEED = 35,
-        AIR_CAP = 2.0,  -- But allows high speeds through strafing
+        AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 50,
-        GROUND_DISTANCE = 0.2,
+        GROUND_DISTANCE = 0.8,  -- Increased for Roblox
         SNAP_DOWN_DISTANCE = 0.15,
         COYOTE_TIME = 0.1,
         JUMP_BUFFER_TIME = 0.1,
@@ -144,11 +144,11 @@ local presetLibrary = {
         GROUND_ACCELERATE = 8.0,  -- Very high acceleration
         AIR_ACCELERATE = 8.0,  -- Very high for easy mode
         GROUND_SPEED = 35,
-        AIR_CAP = 1.2,
+        AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
         STOP_SPEED = 0.5,
         SLOPE_LIMIT = 60,
-        GROUND_DISTANCE = 0.2,
+        GROUND_DISTANCE = 0.8,  -- Increased for Roblox
         SNAP_DOWN_DISTANCE = 0.15,
         COYOTE_TIME = 0.15,  -- More forgiving
         JUMP_BUFFER_TIME = 0.15,  -- More forgiving
@@ -373,8 +373,8 @@ local function handleJump()
 
     -- Execute jump
     if canJump and (cachedInputs.jump or jumpBuffered) then
-        -- Apply jump (vertical only)
-        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
+        -- Apply jump using AssemblyLinearVelocity (vertical only)
+        rootPart.AssemblyLinearVelocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
 
         -- Prevent re-triggering
         isGrounded = false
@@ -409,8 +409,8 @@ local function updatePhysics(dt)
     updateGroundState()
     debugData.onGround = isGrounded
 
-    -- 3. Get current velocity from Roblox and clamp near-zero to prevent flickering
-    local robloxVel = rootPart.Velocity
+    -- 3. Get current velocity from AssemblyLinearVelocity (not fought by Humanoid)
+    local robloxVel = rootPart.AssemblyLinearVelocity
     local velX = math.abs(robloxVel.X) < 0.5 and 0 or robloxVel.X
     local velZ = math.abs(robloxVel.Z) < 0.5 and 0 or robloxVel.Z
     vel2 = Vector2.new(velX, velZ)
@@ -424,8 +424,8 @@ local function updatePhysics(dt)
         -- Ground: wish speed is config value
         wishSpeed = config.GROUND_SPEED
     else
-        -- Air: wish speed is air cap (multiplier of ground speed)
-        wishSpeed = config.GROUND_SPEED * config.AIR_CAP
+        -- Air: wish speed capped at air cap (not a multiplier - an actual cap)
+        wishSpeed = math.min(config.GROUND_SPEED, config.GROUND_SPEED * config.AIR_CAP)
     end
 
     debugData.wishSpeed = wishSpeed
@@ -457,16 +457,16 @@ local function updatePhysics(dt)
         didJump = handleJump()
     end
 
-    -- 8. Apply velocity (set directly, preserve vertical component)
+    -- 8. Apply velocity using AssemblyLinearVelocity (not fought by Humanoid)
     if not didJump then
-        local currentY = rootPart.Velocity.Y
-        rootPart.Velocity = Vector3.new(vel2.X, currentY, vel2.Y)
+        local currentY = rootPart.AssemblyLinearVelocity.Y
+        rootPart.AssemblyLinearVelocity = Vector3.new(vel2.X, currentY, vel2.Y)
     end
 
-    -- 9. Snap to ground if needed
-    if isGrounded and not didJump then
-        snapToGround()
-    end
+    -- 9. Snap to ground if needed (disabled - can kill horizontal speed)
+    -- if isGrounded and not didJump then
+    --     snapToGround()
+    -- end
 
     -- 10. Track max speed
     local speed2D = vel2.Magnitude
@@ -488,17 +488,27 @@ function Physics.init(plr, char, hum, root)
 
     originalWalkSpeed = humanoid.WalkSpeed
     originalJumpPower = humanoid.JumpPower
-    originalPhysicalProperties = rootPart.CustomPhysicalProperties
 
-    -- Disable Roblox material-based friction (this is critical!)
-    -- Set CustomPhysicalProperties to override material friction
-    rootPart.CustomPhysicalProperties = PhysicalProperties.new(
-        0.7,   -- Density
-        0,     -- Friction (ZERO - we handle this ourselves)
-        0,     -- Elasticity
-        1,     -- FrictionWeight
-        1      -- ElasticityWeight
-    )
+    -- Store original physical properties for ALL body parts
+    originalPhysicalProperties = {}
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalPhysicalProperties[part] = part.CustomPhysicalProperties
+        end
+    end
+
+    -- Apply zero friction to ALL body parts (not just rootPart!)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CustomPhysicalProperties = PhysicalProperties.new(
+                0.7,   -- Density
+                0,     -- Friction (ZERO - we handle this ourselves)
+                0,     -- Elasticity
+                1,     -- FrictionWeight
+                1      -- ElasticityWeight
+            )
+        end
+    end
 
     -- Track text box focus
     UserInputService.TextBoxFocused:Connect(function()
@@ -530,21 +540,29 @@ function Physics.toggleBhop(value)
         vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
 
-        -- Apply custom physics properties
-        rootPart.CustomPhysicalProperties = PhysicalProperties.new(
-            0.7,   -- Density
-            0,     -- Friction (ZERO - we handle this ourselves)
-            0,     -- Elasticity
-            1,     -- FrictionWeight
-            1      -- ElasticityWeight
-        )
+        -- Apply custom physics properties to ALL body parts
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CustomPhysicalProperties = PhysicalProperties.new(
+                    0.7,   -- Density
+                    0,     -- Friction (ZERO - we handle this ourselves)
+                    0,     -- Elasticity
+                    1,     -- FrictionWeight
+                    1      -- ElasticityWeight
+                )
+            end
+        end
     else
         humanoid.WalkSpeed = originalWalkSpeed
         humanoid.JumpPower = originalJumpPower
-        rootPart.Velocity = Vector3.new(0, 0, 0)
+        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 
-        -- Restore original physical properties
-        rootPart.CustomPhysicalProperties = originalPhysicalProperties
+        -- Restore original physical properties for ALL body parts
+        for part, props in pairs(originalPhysicalProperties) do
+            if part:IsA("BasePart") then
+                part.CustomPhysicalProperties = props
+            end
+        end
     end
 
     return bhopEnabled
