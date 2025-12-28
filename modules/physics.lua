@@ -38,13 +38,13 @@ local originalJumpPower
 local config = {
     -- Ground movement
     GROUND_FRICTION = 4,
-    GROUND_ACCELERATE = 10,  -- Source Engine value
-    GROUND_SPEED = 250,  -- Source Engine units (250 = standard run speed)
-    STOP_SPEED = 100,
+    GROUND_ACCELERATE = 5,  -- Reduced for Roblox scale
+    GROUND_SPEED = 30,  -- Target ground speed in Roblox units
+    STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 10,  -- Source Engine value
-    AIR_CAP = 0.3,  -- Air speed cap multiplier
+    AIR_ACCELERATE = 50,  -- Higher for responsive strafing
+    AIR_CAP = 0.7,  -- Air speed cap multiplier (70% of ground speed)
 
     -- Jump
     JUMP_POWER = 50,
@@ -80,16 +80,16 @@ local debugData = {
     jumpBuffered = false,
 }
 
--- Preset Library (Source Engine units)
+-- Preset Library (Roblox scale)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 10,
-        GROUND_SPEED = 250,  -- Source units
-        AIR_CAP = 0.3,
+        GROUND_ACCELERATE = 5,
+        AIR_ACCELERATE = 50,
+        GROUND_SPEED = 30,
+        AIR_CAP = 0.7,
         JUMP_POWER = 50,
-        STOP_SPEED = 100,
+        STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -98,12 +98,12 @@ local presetLibrary = {
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 14,
-        AIR_ACCELERATE = 100,  -- CS:GO has very high air accel
-        GROUND_SPEED = 250,
-        AIR_CAP = 0.08,  -- Very low air cap
+        GROUND_ACCELERATE = 7,
+        AIR_ACCELERATE = 200,  -- CS:GO has very high air accel
+        GROUND_SPEED = 30,
+        AIR_CAP = 0.3,  -- Very low air cap for tight control
         JUMP_POWER = 55,
-        STOP_SPEED = 100,
+        STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -112,12 +112,12 @@ local presetLibrary = {
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 15,
-        AIR_ACCELERATE = 10,
-        GROUND_SPEED = 400,  -- Scout is faster
-        AIR_CAP = 0.25,
+        GROUND_ACCELERATE = 8,
+        AIR_ACCELERATE = 50,
+        GROUND_SPEED = 40,  -- Scout is faster
+        AIR_CAP = 0.6,
         JUMP_POWER = 58,
-        STOP_SPEED = 100,
+        STOP_SPEED = 1,
         SLOPE_LIMIT = 50,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -126,12 +126,12 @@ local presetLibrary = {
     },
     ["Quake"] = {
         GROUND_FRICTION = 6,
-        GROUND_ACCELERATE = 10,
-        AIR_ACCELERATE = 1,  -- Quake has very low air accel
-        GROUND_SPEED = 320,
-        AIR_CAP = 1.0,  -- But allows high speeds
+        GROUND_ACCELERATE = 5,
+        AIR_ACCELERATE = 5,  -- Quake has low air accel
+        GROUND_SPEED = 35,
+        AIR_CAP = 2.0,  -- But allows high speeds through strafing
         JUMP_POWER = 60,
-        STOP_SPEED = 100,
+        STOP_SPEED = 1,
         SLOPE_LIMIT = 50,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
@@ -140,12 +140,12 @@ local presetLibrary = {
     },
     ["Easy Mode"] = {
         GROUND_FRICTION = 2,
-        GROUND_ACCELERATE = 20,
-        AIR_ACCELERATE = 20,
-        GROUND_SPEED = 300,
-        AIR_CAP = 0.6,
+        GROUND_ACCELERATE = 10,
+        AIR_ACCELERATE = 100,
+        GROUND_SPEED = 35,
+        AIR_CAP = 1.2,
         JUMP_POWER = 60,
-        STOP_SPEED = 50,
+        STOP_SPEED = 0.5,
         SLOPE_LIMIT = 60,
         GROUND_DISTANCE = 0.2,
         SNAP_DOWN_DISTANCE = 0.15,
