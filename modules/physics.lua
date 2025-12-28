@@ -38,13 +38,13 @@ local originalPhysicalProperties = {}  -- Store for all body parts
 -- Configuration (CS 1.6 defaults)
 local config = {
     -- Ground movement
-    GROUND_FRICTION = 2,  -- Lower friction to maintain speed on landing
-    GROUND_ACCELERATE = 5.0,  -- Higher for responsive ground movement
+    GROUND_FRICTION = 4,  -- Standard friction
+    GROUND_ACCELERATE = 200,  -- High for instant response
     GROUND_SPEED = 30,  -- Target ground speed in Roblox units
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 3.0,  -- Higher for responsive air strafing
+    AIR_ACCELERATE = 100,  -- High for good air control
     AIR_CAP = 1.0,  -- Air wishspeed cap (1.0 = no limit, same as ground)
 
     -- Jump
@@ -84,11 +84,11 @@ local debugData = {
 -- Preset Library (Roblox scale)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
-        GROUND_FRICTION = 2,  -- Lower to maintain speed
-        GROUND_ACCELERATE = 5.0,  -- Higher for responsive movement
-        AIR_ACCELERATE = 3.0,  -- Higher for good air control
+        GROUND_FRICTION = 4,  -- Standard friction
+        GROUND_ACCELERATE = 200,  -- High for instant response
+        AIR_ACCELERATE = 100,  -- Good air control
         GROUND_SPEED = 30,
-        AIR_CAP = 1.0,  -- Air wishspeed cap = ground speed (no limit)
+        AIR_CAP = 1.0,  -- No air limit
         JUMP_POWER = 50,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
@@ -98,11 +98,11 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["CS:GO Style"] = {
-        GROUND_FRICTION = 2.5,  -- Lower to maintain speed
-        GROUND_ACCELERATE = 5.5,  -- Higher for responsive movement
-        AIR_ACCELERATE = 3.5,  -- Slightly higher than 1.6
+        GROUND_FRICTION = 5.2,
+        GROUND_ACCELERATE = 220,  -- Slightly higher than 1.6
+        AIR_ACCELERATE = 120,  -- Slightly higher air control
         GROUND_SPEED = 30,
-        AIR_CAP = 0.8,  -- Less restrictive for Roblox
+        AIR_CAP = 0.8,  -- Some air restriction
         JUMP_POWER = 55,
         STOP_SPEED = 1,
         SLOPE_LIMIT = 45,
@@ -112,9 +112,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["TF2 Scout"] = {
-        GROUND_FRICTION = 2,
-        GROUND_ACCELERATE = 6.0,  -- Higher for fast scout
-        AIR_ACCELERATE = 3.5,
+        GROUND_FRICTION = 4,
+        GROUND_ACCELERATE = 250,  -- Faster acceleration
+        AIR_ACCELERATE = 120,
         GROUND_SPEED = 40,  -- Scout is faster
         AIR_CAP = 1.0,  -- No air limit
         JUMP_POWER = 58,
@@ -126,9 +126,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["Quake"] = {
-        GROUND_FRICTION = 3,
-        GROUND_ACCELERATE = 4.0,
-        AIR_ACCELERATE = 2.0,  -- Quake has moderate air accel
+        GROUND_FRICTION = 6,
+        GROUND_ACCELERATE = 180,
+        AIR_ACCELERATE = 80,  -- Moderate air accel
         GROUND_SPEED = 35,
         AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
@@ -140,9 +140,9 @@ local presetLibrary = {
         JUMP_BUFFER_TIME = 0.1,
     },
     ["Easy Mode"] = {
-        GROUND_FRICTION = 1,  -- Very low friction
-        GROUND_ACCELERATE = 8.0,  -- Very high acceleration
-        AIR_ACCELERATE = 8.0,  -- Very high for easy mode
+        GROUND_FRICTION = 2,  -- Low friction
+        GROUND_ACCELERATE = 300,  -- Very high acceleration
+        AIR_ACCELERATE = 200,  -- Very high for easy mode
         GROUND_SPEED = 35,
         AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
@@ -330,9 +330,10 @@ local function accelerate(wishDir, wishSpeed, accel, dt)
         return
     end
 
-    -- Acceleration amount (correct Source Engine formula)
-    -- accel * dt * wishSpeed gives proper acceleration
-    local accelSpeed = accel * dt * wishSpeed
+    -- Acceleration amount (Roblox-adapted formula)
+    -- In Source Engine it's: accel * dt * wishSpeed * surfaceFriction
+    -- But for Roblox we use: accel * dt (simpler, scales better)
+    local accelSpeed = accel * dt
     accelSpeed = math.min(accelSpeed, addSpeed)
 
     -- Apply acceleration
