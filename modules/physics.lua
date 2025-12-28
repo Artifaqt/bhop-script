@@ -264,23 +264,19 @@ end
 local function updateGroundState()
     if not rootPart then return end
 
-    local rayOrigin = rootPart.Position + Vector3.new(0, 0.5, 0)
-    local rayDirection = Vector3.new(0, -(config.GROUND_DISTANCE + 0.8), 0)
+    local rayOrigin = rootPart.Position + Vector3.new(0, 0.1, 0)
+    local rayDirection = Vector3.new(0, -(config.GROUND_DISTANCE + 0.1), 0)
 
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {character}
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
     -- Use AddToFilter method instead of iterating all descendants (performance fix)
-    raycastParams.CollisionGroup = rootPart.CollisionGroup
+    raycastParams.CollisionGroup = "Default"
 
     local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 
-    
-    -- Debug: show what the ground ray is hitting
-    debugData.rayHit = (raycastResult and raycastResult.Instance and raycastResult.Instance.Name) or \"nil\"
-    debugData.rayDist = (raycastResult and raycastResult.Distance) or -1
-if raycastResult then
+    if raycastResult then
         groundNormal = raycastResult.Normal
 
         -- Check slope limit (only walkable if normal.Y >= cos(slopeLimit))
@@ -430,22 +426,6 @@ end
 local function updatePhysics(dt)
     if not bhopEnabled or not character or not rootPart then
         return
-
-    -- Debug log snapshot (kept small; dump with Physics.dumpLog())
-    logFrame({
-        t = tick(),
-        dt = debugData.dt,
-        grounded = isGrounded,
-        state = (humanoid and humanoid:GetState() and humanoid:GetState().Name) or "nil",
-        speed2D = debugData.speed2D,
-        wishSpeed = debugData.wishSpeed,
-        currentSpeed = debugData.currentSpeed,
-        addSpeed = debugData.addSpeed,
-        accelSpeed = debugData.accelSpeed,
-        pos = {rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z},
-        vel = {rootPart.AssemblyLinearVelocity.X, rootPart.AssemblyLinearVelocity.Y, rootPart.AssemblyLinearVelocity.Z},
-    })
-
     end
 
     -- Clamp dt
@@ -534,24 +514,6 @@ function Physics.init(plr, char, hum, root)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
             originalPhysicalProperties[part] = part.CustomPhysicalProperties
-
-    -- Bind optional debug log hotkeys once
-    if not logKeysBound then
-        logKeysBound = true
-        UserInputService.InputBegan:Connect(function(input, gp)
-            if gp then return end
-            if input.KeyCode == LOG_TOGGLE_KEY then
-                Physics.setLogging(not Physics.isLogging())
-                warn("[BHOP] Physics logging: " .. tostring(Physics.isLogging()))
-            elseif input.KeyCode == LOG_DUMP_KEY then
-                local ok, name = Physics.dumpLog()
-                if ok then
-                    warn("[BHOP] Wrote log: " .. tostring(name))
-                end
-            end
-        end)
-    end
-
         end
     end
 
@@ -622,7 +584,7 @@ function Physics.toggleBhop(value)
         -- Restore original physical properties for ALL body parts
         for part, props in pairs(originalPhysicalProperties) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = props
+                part.CustomPhysicalProperties = propss
             end
         end
     end
