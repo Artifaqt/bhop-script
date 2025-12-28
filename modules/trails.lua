@@ -333,6 +333,7 @@ function Trails.exportConfig()
     return {
         trails = trailConfig,
         enabled = enabled,
+        presets = trailPresets,  -- Include saved presets
     }
 end
 
@@ -353,6 +354,11 @@ function Trails.importConfig(data)
 
     if data.enabled ~= nil then
         enabled = data.enabled
+    end
+
+    -- Import saved presets
+    if data.presets and type(data.presets) == "table" then
+        trailPresets = data.presets
     end
 end
 

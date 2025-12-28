@@ -11,6 +11,64 @@ local Starlight, NebulaIcons
 local Physics, Visuals, Trails, Sounds, Stats
 local BhopToggle, AutoHopToggle
 
+-- Physics UI element references
+local PhysicsSliders = {}
+
+-- Function to update physics UI elements to reflect current config
+local function updatePhysicsUI()
+    local config = Physics.getConfig()
+
+    -- Safe update function that tries multiple methods
+    local function safeSetSlider(slider, value)
+        if not slider then return false end
+
+        -- Try direct Set method
+        if type(slider) == "table" and type(slider.Set) == "function" then
+            local ok = pcall(function()
+                slider:Set(value)
+            end)
+            if ok then return true end
+        end
+
+        -- Try SetValue method
+        if type(slider) == "table" and type(slider.SetValue) == "function" then
+            local ok = pcall(function()
+                slider:SetValue(value)
+            end)
+            if ok then return true end
+        end
+
+        -- Try Starlight flag system
+        if Starlight and type(Starlight.SetFlag) == "function" then
+            for flagName, sliderRef in pairs({
+                ground_friction_slider = PhysicsSliders.friction,
+                ground_accel_slider = PhysicsSliders.groundAccel,
+                ground_speed_slider = PhysicsSliders.groundSpeed,
+                air_accel_slider = PhysicsSliders.airAccel,
+                air_cap_slider = PhysicsSliders.airCap,
+                jump_power_slider = PhysicsSliders.jumpPower,
+            }) do
+                if sliderRef == slider then
+                    pcall(function()
+                        Starlight:SetFlag(flagName, value)
+                    end)
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
+    -- Update all sliders
+    safeSetSlider(PhysicsSliders.friction, config.GROUND_FRICTION)
+    safeSetSlider(PhysicsSliders.groundAccel, config.GROUND_ACCELERATE)
+    safeSetSlider(PhysicsSliders.groundSpeed, config.GROUND_SPEED)
+    safeSetSlider(PhysicsSliders.airAccel, config.AIR_ACCELERATE)
+    safeSetSlider(PhysicsSliders.airCap, config.AIR_CAP)
+    safeSetSlider(PhysicsSliders.jumpPower, config.JUMP_POWER)
+end
+
 local function createWindow()
     return Starlight:CreateWindow({
         Name = "Bhop Hub",
@@ -97,7 +155,7 @@ local function createPhysicsTab(window)
 
     local config = Physics.getConfig()
 
-    GroundPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.friction = GroundPhysicsGroupbox:CreateSlider({
         Name = "Friction",
         Icon = NebulaIcons:GetIcon('straighten', 'Material'),
         Range = {0, 20},
@@ -109,7 +167,7 @@ local function createPhysicsTab(window)
         end,
     }, "ground_friction_slider")
 
-    GroundPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.groundAccel = GroundPhysicsGroupbox:CreateSlider({
         Name = "Acceleration",
         Icon = NebulaIcons:GetIcon('speed', 'Material'),
         Range = {1, 50},
@@ -121,7 +179,7 @@ local function createPhysicsTab(window)
         end,
     }, "ground_accel_slider")
 
-    GroundPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.groundSpeed = GroundPhysicsGroupbox:CreateSlider({
         Name = "Ground Speed",
         Icon = NebulaIcons:GetIcon('directions_run', 'Material'),
         Range = {10, 50},
@@ -138,7 +196,7 @@ local function createPhysicsTab(window)
         Column = 2,
     }, "air_physics_groupbox")
 
-    AirPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.airAccel = AirPhysicsGroupbox:CreateSlider({
         Name = "Air Acceleration",
         Icon = NebulaIcons:GetIcon('air', 'Material'),
         Range = {1, 100},
@@ -150,7 +208,7 @@ local function createPhysicsTab(window)
         end,
     }, "air_accel_slider")
 
-    AirPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.airCap = AirPhysicsGroupbox:CreateSlider({
         Name = "Air Cap",
         Icon = NebulaIcons:GetIcon('height', 'Material'),
         Range = {0.1, 30},
@@ -162,7 +220,7 @@ local function createPhysicsTab(window)
         end,
     }, "air_cap_slider")
 
-    AirPhysicsGroupbox:CreateSlider({
+    PhysicsSliders.jumpPower = AirPhysicsGroupbox:CreateSlider({
         Name = "Jump Power",
         Icon = NebulaIcons:GetIcon('arrow_upward', 'Material'),
         Range = {20, 100},
@@ -207,6 +265,7 @@ local function createPresetsTab(window)
         Callback = function(options)
             if #options > 0 then
                 Physics.loadPreset(options[1])
+                updatePhysicsUI()  -- Update UI to reflect new preset values
                 Starlight:Notification({
                     Title = "Preset Loaded",
                     Icon = NebulaIcons:GetIcon('check', 'Material'),
@@ -260,6 +319,9 @@ local function createPresetsTab(window)
                 if importData.visuals then Visuals.importConfig(importData.visuals) end
                 if importData.trails then Trails.importConfig(importData.trails) end
                 if importData.sounds then Sounds.importConfig(importData.sounds) end
+
+                -- Update UI to reflect imported values
+                updatePhysicsUI()
 
                 Starlight:Notification({
                     Title = "Config Imported",
@@ -403,6 +465,12 @@ local function createTrailsTab(window)
         CurrentValue = trailConfig.decalTexture,
         Callback = function(text)
             Trails.setDecalTexture(text)
+            -- Auto-preview on paste
+            if text and text ~= "" then
+                task.delay(0.1, function()
+                    Trails.previewDecal()
+                end)
+            end
         end,
     }, "decal_texture_input")
 
@@ -581,6 +649,12 @@ local function createSoundsTab(window)
         CurrentValue = soundConfig.jumpSoundId,
         Callback = function(text)
             Sounds.setJumpSound(text)
+            -- Auto-preview on paste
+            if text and text ~= "" then
+                task.delay(0.1, function()
+                    Sounds.previewJump()
+                end)
+            end
         end,
     }, "jump_sound_id")
 
@@ -625,6 +699,12 @@ local function createSoundsTab(window)
         CurrentValue = soundConfig.landSoundId,
         Callback = function(text)
             Sounds.setLandSound(text)
+            -- Auto-preview on paste
+            if text and text ~= "" then
+                task.delay(0.1, function()
+                    Sounds.previewLand()
+                end)
+            end
         end,
     }, "land_sound_id")
 

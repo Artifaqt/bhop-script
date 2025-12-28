@@ -280,18 +280,70 @@ function Visuals.update(speed, onGround, sessionStats)
         local wishDir = Physics.getWishDir()
         if wishDir.Magnitude > 0 then
             local velocity = Physics.getVelocity()
+            local config = Physics.getConfig()
+
+            -- Calculate arrow rotation
             local angle = math.atan2(wishDir.X, wishDir.Z)
             directionArrow.Rotation = math.deg(-angle)
 
-            local dot = velocity.Unit:Dot(wishDir)
-            local efficiency = math.clamp((dot + 1) / 2, 0, 1)
-            strafeQualityLabel.Text = string.format("Efficiency: %.0f%%", efficiency * 100)
+            -- CS/Quake-style strafe efficiency calculation
+            local speed2D = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+            local efficiency = 0
+            local actualAngleDeg = 0
+            local optimalAngleDeg = 0
 
-            if efficiency > 0.9 then
-                directionArrow.ImageColor3 = Color3.fromRGB(100, 255, 100)
-            elseif efficiency > 0.7 then
-                directionArrow.ImageColor3 = Color3.fromRGB(255, 255, 100)
+            if speed2D > 0.1 then
+                -- Calculate actual angle between velocity and wish direction
+                local velocityDir = Vector3.new(velocity.X, 0, velocity.Z).Unit
+                local wishDirFlat = Vector3.new(wishDir.X, 0, wishDir.Z).Unit
+                local dot = math.clamp(velocityDir:Dot(wishDirFlat), -1, 1)
+                actualAngleDeg = math.deg(math.acos(dot))
+
+                -- Calculate optimal strafe angle
+                if speed2D > config.AIR_CAP then
+                    -- At speeds above AIR_CAP, there's an optimal angle
+                    local ratio = math.clamp(config.AIR_CAP / speed2D, 0, 1)
+                    optimalAngleDeg = math.deg(math.acos(ratio))
+                else
+                    -- Below AIR_CAP, optimal is to strafe directly forward
+                    optimalAngleDeg = 0
+                end
+
+                -- Calculate efficiency based on angular deviation
+                local angleDiff = math.abs(actualAngleDeg - optimalAngleDeg)
+
+                -- Speed-based tolerance (tighter at low speeds, looser at high speeds)
+                local speedFactor = math.clamp(speed2D / 50, 0.3, 1)
+                local maxTolerance = 15 + (25 * speedFactor)  -- 15° at low speed, up to 40° at high speed
+
+                efficiency = math.clamp(1 - (angleDiff / maxTolerance), 0, 1)
+
+                -- Update label with angle info
+                if visualConfig.showDebugHUD then
+                    strafeQualityLabel.Text = string.format("Efficiency: %.0f%% (%.0f° / %.0f°)",
+                        efficiency * 100, actualAngleDeg, optimalAngleDeg)
+                else
+                    strafeQualityLabel.Text = string.format("Efficiency: %.0f%%", efficiency * 100)
+                end
             else
+                strafeQualityLabel.Text = "Efficiency: 0%"
+            end
+
+            -- More intuitive color feedback
+            if efficiency > 0.85 then
+                -- Perfect (green)
+                directionArrow.ImageColor3 = Color3.fromRGB(100, 255, 100)
+            elseif efficiency > 0.65 then
+                -- Good (yellow-green)
+                directionArrow.ImageColor3 = Color3.fromRGB(200, 255, 100)
+            elseif efficiency > 0.45 then
+                -- Okay (yellow)
+                directionArrow.ImageColor3 = Color3.fromRGB(255, 255, 100)
+            elseif efficiency > 0.25 then
+                -- Poor (orange)
+                directionArrow.ImageColor3 = Color3.fromRGB(255, 180, 100)
+            else
+                -- Bad (red)
                 directionArrow.ImageColor3 = Color3.fromRGB(255, 100, 100)
             end
         end
