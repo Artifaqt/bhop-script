@@ -39,13 +39,14 @@ local originalPhysicalProperties = {}  -- Store for all body parts
 local config = {
     -- Ground movement
     GROUND_FRICTION = 4,  -- Standard friction
-    GROUND_ACCELERATE = 200,  -- High for instant response
+    GROUND_ACCELERATE = 10,  -- Source-like value (will be multiplied by wishSpeed * dt)
     GROUND_SPEED = 30,  -- Target ground speed in Roblox units
     STOP_SPEED = 1,
 
     -- Air movement
-    AIR_ACCELERATE = 100,  -- High for good air control
+    AIR_ACCELERATE = 15,  -- Source-like value for air control
     AIR_CAP = 1.0,  -- Air wishspeed cap (1.0 = no limit, same as ground)
+    AIR_WISH_SPEED_CAP = 30,  -- Air wishspeed cap used for acceleration (Source-like)
 
     -- Jump
     JUMP_POWER = 50,
@@ -84,9 +85,9 @@ local debugData = {
 -- Preset Library (Roblox scale)
 local presetLibrary = {
     ["CS 1.6 Classic"] = {
-        GROUND_FRICTION = 4,  -- Standard friction
-        GROUND_ACCELERATE = 200,  -- High for instant response
-        AIR_ACCELERATE = 100,  -- Good air control
+        GROUND_FRICTION = 4,
+        GROUND_ACCELERATE = 10,  -- Source-like value
+        AIR_ACCELERATE = 15,  -- Source-like value
         GROUND_SPEED = 30,
         AIR_CAP = 1.0,  -- No air limit
         JUMP_POWER = 50,
@@ -99,8 +100,8 @@ local presetLibrary = {
     },
     ["CS:GO Style"] = {
         GROUND_FRICTION = 5.2,
-        GROUND_ACCELERATE = 220,  -- Slightly higher than 1.6
-        AIR_ACCELERATE = 120,  -- Slightly higher air control
+        GROUND_ACCELERATE = 12,  -- Slightly higher than 1.6
+        AIR_ACCELERATE = 18,  -- Slightly higher air control
         GROUND_SPEED = 30,
         AIR_CAP = 0.8,  -- Some air restriction
         JUMP_POWER = 55,
@@ -113,8 +114,8 @@ local presetLibrary = {
     },
     ["TF2 Scout"] = {
         GROUND_FRICTION = 4,
-        GROUND_ACCELERATE = 250,  -- Faster acceleration
-        AIR_ACCELERATE = 120,
+        GROUND_ACCELERATE = 12,  -- Faster acceleration
+        AIR_ACCELERATE = 18,
         GROUND_SPEED = 40,  -- Scout is faster
         AIR_CAP = 1.0,  -- No air limit
         JUMP_POWER = 58,
@@ -127,8 +128,8 @@ local presetLibrary = {
     },
     ["Quake"] = {
         GROUND_FRICTION = 6,
-        GROUND_ACCELERATE = 180,
-        AIR_ACCELERATE = 80,  -- Moderate air accel
+        GROUND_ACCELERATE = 10,
+        AIR_ACCELERATE = 10,  -- Classic Quake value
         GROUND_SPEED = 35,
         AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
@@ -141,8 +142,8 @@ local presetLibrary = {
     },
     ["Easy Mode"] = {
         GROUND_FRICTION = 2,  -- Low friction
-        GROUND_ACCELERATE = 300,  -- Very high acceleration
-        AIR_ACCELERATE = 200,  -- Very high for easy mode
+        GROUND_ACCELERATE = 20,  -- Higher for easy mode
+        AIR_ACCELERATE = 30,  -- Very high for easy mode
         GROUND_SPEED = 35,
         AIR_CAP = 1.5,  -- Allow higher speeds
         JUMP_POWER = 60,
@@ -217,19 +218,46 @@ end
 
 -- Build wish velocity from inputs (normalized diagonal)
 local function getWishVelocity()
-    local forward, right = getYawVectors()
-
-    -- Build wish velocity
-    local wishVel = forward * cachedInputs.forward + right * cachedInputs.right
-
-    -- Normalize diagonal input (so W+A isn't faster than W alone)
-    if wishVel:Dot(wishVel) > 0.01 then
-        wishVel = wishVel.Unit
-    else
-        wishVel = Vector2.new(0, 0)
+    -- Build wish velocity from cached input and camera yaw (horizontal only).
+    -- Returns BOTH wishDir and wishSpeed (Source-style pipeline).
+    if isTyping then
+        return Vector3.zero, 0
     end
 
-    return wishVel
+    local fmove = cachedInputs.forward  -- -1..1
+    local smove = cachedInputs.right    -- -1..1
+
+    if math.abs(fmove) < 1e-3 and math.abs(smove) < 1e-3 then
+        return Vector3.zero, 0
+    end
+
+    local forward, right = getYawVectors()
+
+    -- Raw wish velocity (not normalized yet)
+    local wishVel = forward * fmove + right * smove
+    local wishMag = wishVel.Magnitude
+    if wishMag < 1e-3 then
+        return Vector3.zero, 0
+    end
+
+    local wishDir = wishVel / wishMag
+
+    -- Wishspeed: scale by input magnitude (diagonal normalized via wishMag<=sqrt(2))
+    -- This feels closer to Source and fixes 'no gain' cases where wishspeed is effectively too low.
+    local inputScale = math.clamp(wishMag, 0, 1) -- keyboard typically 1, diagonal slightly >1 before clamp
+    local baseWishSpeed = config.GROUND_SPEED * inputScale
+
+    local wishSpeed
+    if isGrounded then
+        wishSpeed = baseWishSpeed
+    else
+        -- Air wishspeed cap (Source-like): cap the wishspeed used for acceleration,
+        -- but DO NOT cap the actual velocity magnitude.
+        local airCap = config.AIR_WISH_SPEED_CAP or config.GROUND_SPEED
+        wishSpeed = math.min(baseWishSpeed, airCap)
+    end
+
+    return wishDir, wishSpeed
 end
 
 -- Robust ground detection with slope checking
@@ -330,11 +358,12 @@ local function accelerate(wishDir, wishSpeed, accel, dt)
         return
     end
 
-    -- Acceleration amount (Roblox-adapted formula)
-    -- In Source Engine it's: accel * dt * wishSpeed * surfaceFriction
-    -- But for Roblox we use: accel * dt (simpler, scales better)
-    local accelSpeed = accel * dt
-    accelSpeed = math.min(accelSpeed, addSpeed)
+    -- Acceleration amount (Source Engine formula)
+    -- accel * wishSpeed * dt gives proper acceleration that scales with speed
+    local accelSpeed = accel * wishSpeed * dt
+    if accelSpeed > addSpeed then
+        accelSpeed = addSpeed
+    end
 
     -- Apply acceleration
     vel2 = vel2 + wishDir * accelSpeed
@@ -412,24 +441,14 @@ local function updatePhysics(dt)
 
     -- 3. Get current velocity from AssemblyLinearVelocity (not fought by Humanoid)
     local robloxVel = rootPart.AssemblyLinearVelocity
-    local velX = math.abs(robloxVel.X) < 0.5 and 0 or robloxVel.X
-    local velZ = math.abs(robloxVel.Z) < 0.5 and 0 or robloxVel.Z
+    local velX = math.abs(robloxVel.X) < 0.05 and 0 or robloxVel.X
+    local velZ = math.abs(robloxVel.Z) < 0.05 and 0 or robloxVel.Z
     vel2 = Vector2.new(velX, velZ)
 
-    -- 4. Build wish direction/speed
-    local wishVel = getWishVelocity()
-    local wishDir = wishVel
-    local wishSpeed = 0
-
-    if isGrounded then
-        -- Ground: wish speed is config value
-        wishSpeed = config.GROUND_SPEED
-    else
-        -- Air: wish speed capped at air cap (not a multiplier - an actual cap)
-        wishSpeed = math.min(config.GROUND_SPEED, config.GROUND_SPEED * config.AIR_CAP)
-    end
-
+    -- 4. Build wish direction + wish speed (Source-style)
+    local wishDir, wishSpeed = getWishVelocity()
     debugData.wishSpeed = wishSpeed
+
 
     -- 5. Apply friction (ground only)
     if isGrounded then
@@ -449,7 +468,7 @@ local function updatePhysics(dt)
     local didJump = false
     if autoHop and isGrounded then
         -- Auto-hop: always jump when grounded
-        rootPart.Velocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
+        rootPart.AssemblyLinearVelocity = Vector3.new(vel2.X, config.JUMP_POWER, vel2.Y)
         isGrounded = false
         lastGroundTime = 0
         didJump = true
@@ -538,6 +557,8 @@ function Physics.toggleBhop(value)
     if bhopEnabled then
         humanoid.WalkSpeed = 0
         humanoid.JumpPower = 0
+        humanoid.AutoRotate = false
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
         vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
 
@@ -556,12 +577,14 @@ function Physics.toggleBhop(value)
     else
         humanoid.WalkSpeed = originalWalkSpeed
         humanoid.JumpPower = originalJumpPower
+        humanoid.AutoRotate = true
+        humanoid:ChangeState(Enum.HumanoidStateType.Running)
         rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 
         -- Restore original physical properties for ALL body parts
         for part, props in pairs(originalPhysicalProperties) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = props
+                part.CustomPhysicalProperties = propss
             end
         end
     end
