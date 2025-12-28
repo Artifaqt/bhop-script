@@ -104,6 +104,7 @@ local function createDashboard(window)
         Icon = NebulaIcons:GetIcon('rocket_launch', 'Material'),
         Callback = function(value)
             Physics.toggleBhop(value)
+            -- Note: This callback is triggered by UI clicks, not B key presses
 
             Starlight:Notification({
                 Title = value and "Bhop Enabled" or "Bhop Disabled",
@@ -803,37 +804,51 @@ function UI.createWindow(starlight, nebulaIcons, physics, visuals, trails, sound
 end
 
 function UI.syncToggle(enabled)
-    -- Starlight versions differ: sometimes CreateToggle returns a boolean rather than an element object.
-    -- This function tries multiple safe update paths and never throws.
-    local ok = false
+    -- Safely update the bhop toggle UI element when B key is pressed
+    -- This function handles various Starlight UI library versions and never throws errors
 
-    if type(BhopToggle) == "table" and type(BhopToggle.Set) == "function" then
-        ok = pcall(function()
-            BhopToggle:Set(enabled)
-        end) or ok
+    -- Method 1: Try direct toggle object methods
+    if BhopToggle and type(BhopToggle) == "table" then
+        pcall(function()
+            -- Try common toggle methods in order of preference
+            if type(BhopToggle.Set) == "function" then
+                BhopToggle:Set(enabled)
+            elseif type(BhopToggle.SetValue) == "function" then
+                BhopToggle:SetValue(enabled)
+            elseif type(BhopToggle.Update) == "function" then
+                BhopToggle:Update(enabled)
+            elseif BhopToggle.Value ~= nil then
+                BhopToggle.Value = enabled
+            end
+        end)
     end
 
-    if not ok and Starlight then
+    -- Method 2: Try Starlight flag system (always attempt, as it's most reliable)
+    if Starlight then
         pcall(function()
+            -- Try SetFlag method
             if type(Starlight.SetFlag) == "function" then
                 Starlight:SetFlag("bhop_toggle", enabled)
-                ok = true
-                return
             end
+        end)
 
-            if type(Starlight.Flags) == "table" and Starlight.Flags["bhop_toggle"] ~= nil then
+        pcall(function()
+            -- Try direct Flags table
+            if type(Starlight.Flags) == "table" then
                 Starlight.Flags["bhop_toggle"] = enabled
-                ok = true
             end
+        end)
 
-            if type(Starlight.Options) == "table" and Starlight.Options["bhop_toggle"] then
+        pcall(function()
+            -- Try Options system
+            if type(Starlight.Options) == "table" and type(Starlight.Options["bhop_toggle"]) == "table" then
                 local opt = Starlight.Options["bhop_toggle"]
                 if type(opt.Set) == "function" then
                     opt:Set(enabled)
-                    ok = true
                 elseif type(opt.SetValue) == "function" then
                     opt:SetValue(enabled)
-                    ok = true
+                elseif opt.Value ~= nil then
+                    opt.Value = enabled
                 end
             end
         end)
