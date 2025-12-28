@@ -500,7 +500,6 @@ local function createTrailsTab(window)
             if not ok then warn("[Trails] Import preset failed: " .. tostring(err)) end
         end,
     }, "trail_preset_import_btn")
-end
 
 local CustomizeGroupbox = TrailsTab:CreateGroupbox({
         Name = "Customization",
@@ -689,7 +688,6 @@ local function setupUpdateLoop()
         Stats.updateStats(speed, dt)
     end)
 end
-
 
 -- Module API
 function UI.createWindow(starlight, nebulaIcons, physics, visuals, trails, sounds, stats)
