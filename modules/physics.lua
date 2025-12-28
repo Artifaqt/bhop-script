@@ -6,6 +6,12 @@ local UserInputService = game:GetService("UserInputService")
 
 local Physics = {}
 
+-- Debounce to avoid double-toggle / rapid input causing desync
+local isSwitching = false
+local lastToggleAt = 0
+local TOGGLE_DEBOUNCE = 0.25
+
+
 -- State
 local player, character, humanoid, rootPart
 local bhopEnabled = false
@@ -262,21 +268,42 @@ end
 
 -- Robust ground detection with slope checking
 local function updateGroundState()
+    if not rootPart or not humanoid then return end
+
+    -- Robust grounded check for Roblox character rigs:
+    -- Use Humanoid.FloorMaterial as a fast signal when available, and raycast as fallback for normal/slope.
+    local floorGrounded = (humanoid.FloorMaterial ~= nil and humanoid.FloorMaterial ~= Enum.Material.Air)
+
+    -- Cast from root center down far enough to reach the feet (root is high off ground when upright).
+    local halfRootY = (rootPart.Size and rootPart.Size.Y or 2) * 0.5
+    local hip = humanoid.HipHeight or 2
+    local slack = (config.GROUND_DISTANCE or 0.25) + 0.75
+    local castLen = halfRootY + hip + slack
+
+    local rayOrigin = rootPart.Position
+    local rayDirection = Vector3.new(0, -castLen, 0)
     if not rootPart then return end
 
-    local rayOrigin = rootPart.Position + Vector3.new(0, 0.1, 0)
-    local rayDirection = Vector3.new(0, -(config.GROUND_DISTANCE + 0.1), 0)
+    local rayOrigin = rootPart.Position + Vector3.new(0, 0.5, 0)
+    local rayDirection = Vector3.new(0, -(config.GROUND_DISTANCE + 0.8), 0)
 
     local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {character}
+    raycastParams.FilterDescendantsInstances = { character }
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-
-    -- Use AddToFilter method instead of iterating all descendants (performance fix)
-    raycastParams.CollisionGroup = "Default"
+    raycastParams.CollisionGroup = rootPart.CollisionGroup
 
     local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+-- Debug: show what the ground ray is hitting
+        -- Debug: show what the ground ray is hitting
+    debugData.rayHit = (raycastResult and raycastResult.Instance and raycastResult.Instance.Name) or "nil"
+    debugData.rayDist = (raycastResult and raycastResult.Distance) or -1
 
+    local groundedByRay = false
     if raycastResult then
+        -- If the ray hit within feet range (+slack), treat as grounded
+        groundedByRay = (raycastResult.Distance <= (halfRootY + hip + (config.GROUND_DISTANCE or 0.25)))
+    end
+if raycastResult then
         groundNormal = raycastResult.Normal
 
         -- Check slope limit (only walkable if normal.Y >= cos(slopeLimit))
@@ -285,7 +312,7 @@ local function updateGroundState()
 
         if slopeAngle <= config.SLOPE_LIMIT then
             local wasGrounded = isGrounded
-            isGrounded = true
+            isGrounded = (floorGrounded or groundedByRay)
             justLanded = not wasGrounded
             lastGroundTime = tick()
             return
@@ -426,6 +453,22 @@ end
 local function updatePhysics(dt)
     if not bhopEnabled or not character or not rootPart then
         return
+
+    -- Debug log snapshot (kept small; dump with Physics.dumpLog())
+    logFrame({
+        t = tick(),
+        dt = debugData.dt,
+        grounded = isGrounded,
+        state = (humanoid and humanoid:GetState() and humanoid:GetState().Name) or "nil",
+        speed2D = debugData.speed2D,
+        wishSpeed = debugData.wishSpeed,
+        currentSpeed = debugData.currentSpeed,
+        addSpeed = debugData.addSpeed,
+        accelSpeed = debugData.accelSpeed,
+        pos = {rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z},
+        vel = {rootPart.AssemblyLinearVelocity.X, rootPart.AssemblyLinearVelocity.Y, rootPart.AssemblyLinearVelocity.Z},
+    })
+
     end
 
     -- Clamp dt
@@ -514,6 +557,24 @@ function Physics.init(plr, char, hum, root)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
             originalPhysicalProperties[part] = part.CustomPhysicalProperties
+
+    -- Bind optional debug log hotkeys once
+    if not logKeysBound then
+        logKeysBound = true
+        UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.KeyCode == LOG_TOGGLE_KEY then
+                Physics.setLogging(not Physics.isLogging())
+                warn("[BHOP] Physics logging: " .. tostring(Physics.isLogging()))
+            elseif input.KeyCode == LOG_DUMP_KEY then
+                local ok, name = Physics.dumpLog()
+                if ok then
+                    warn("[BHOP] Wrote log: " .. tostring(name))
+                end
+            end
+        end)
+    end
+
         end
     end
 
@@ -548,6 +609,14 @@ function Physics.init(plr, char, hum, root)
 end
 
 function Physics.toggleBhop(value)
+    local now = tick()
+    if isSwitching or (now - lastToggleAt) < TOGGLE_DEBOUNCE then
+        return
+    end
+    isSwitching = true
+    lastToggleAt = now
+    task.delay(TOGGLE_DEBOUNCE, function() isSwitching = false end)
+
     if value ~= nil then
         bhopEnabled = value
     else
@@ -557,8 +626,8 @@ function Physics.toggleBhop(value)
     if bhopEnabled then
         humanoid.WalkSpeed = 0
         humanoid.JumpPower = 0
-        humanoid.AutoRotate = false
-        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        humanoid.AutoRotate = true
+        humanoid:ChangeState(Enum.HumanoidStateType.Running)
         vel2 = Vector2.new(0, 0)
         maxSpeedReached = 0
 
@@ -584,7 +653,7 @@ function Physics.toggleBhop(value)
         -- Restore original physical properties for ALL body parts
         for part, props in pairs(originalPhysicalProperties) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = propss
+                part.CustomPhysicalProperties = props
             end
         end
     end
@@ -716,6 +785,10 @@ function Physics.importConfig(data)
             keybindConfig.uiToggleKey = Enum.KeyCode[data.keybinds.uiToggleKey] or Enum.KeyCode.RightShift
         end
     end
+end
+
+function Physics.isSwitching()
+    return isSwitching
 end
 
 return Physics
